@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+.vs/
+*.user
+node_modules/
+work/
+publish/
+TestResults/
+**/appsettings.*.local.json
+.env
+.env.*

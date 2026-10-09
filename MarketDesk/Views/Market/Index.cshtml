@@ -1,0 +1,62 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@model MarketDesk.Models.MarketSnapshot
+@{ Layout = null; var symbol = ViewData["Symbol"] as string ?? ""; }
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Stocklumo: live stock tracking, watchlists and company information powered by Finnhub." />
+    <title>Stocklumo - @(symbol.Length > 0 ? symbol : "Market watch")</title>
+    <link asp-append-version="true" rel="icon" type="image/svg+xml" href="/images/stocklumo-icon.svg" />
+    <link asp-append-version="true" rel="stylesheet" href="/css/market.css" />
+    <script asp-append-version="true" src="/js/market.js" defer></script>
+</head>
+<body data-symbol="@symbol">
+<a class="skip" href="#main">Skip to content</a>
+<section class="ticker" aria-label="Live stock prices"><div id="ticker-stocks" class="ticker-stocks" tabindex="0" aria-label="Stock prices. Scroll horizontally for more stocks."><p>Loading live stock prices...</p></div></section>
+<header class="header">
+    <a class="brand" href="/" aria-label="Stocklumo home"><img asp-append-version="true" src="/images/stocklumo-mark.svg" width="38" height="38" alt="" />Stocklumo</a>
+    <nav aria-label="Main navigation"><a href="/">Dashboard</a><a href="/markets">Markets</a><a href="/watchlist">Watchlist</a><a href="/news">News</a></nav>
+    <button id="theme" type="button">Dark mode</button>
+</header>
+<div class="market-strip"><span id="market-status">US market status unavailable</span><span id="connection" role="status">SETUP</span><span>DATA / FINNHUB</span></div>
+<main id="main" class="page">
+    <section class="intro" aria-labelledby="page-title"><p class="eyebrow">YOUR MARKET, IN FOCUS</p><h1 id="page-title">Track the market. Stay informed.</h1>
+        <div class="search"><label for="search">Find a stock</label><input id="search" type="search" maxlength="60" placeholder="Search stocks, companies, or symbols…" autocomplete="off" aria-controls="search-results" /><p id="search-status" role="status"></p><ul id="search-results" aria-label="Search results" hidden></ul></div>
+    </section>
+    <p id="notice" class="notice" role="status">@Model.Message</p>
+    <section id="overview" class="section"><div class="section-title"><h2>Live stock spotlight</h2><span>SELECTED US STOCKS</span></div><div id="spotlight" class="spotlight"><p class="muted">Loading stock prices...</p></div><p class="caption">A selection of US companies, not a market index or ranking. Prices update as trades arrive; check each timestamp for freshness.</p></section>
+    <article id="stock-detail" hidden>
+        <a class="back" href="/">← Dashboard</a>
+        <div class="stock-header"><div><p id="symbol" class="eyebrow">@symbol</p><h1 id="company">Loading company…</h1><p id="exchange" class="muted"></p></div><button id="save-stock" type="button" disabled>Add to watchlist</button></div>
+        <div class="price-line"><span id="price">-</span><span id="currency"></span></div><p id="change">Waiting for a quote</p><p id="data-age" class="caption">No price received</p>
+        <section class="section"><div class="section-title"><h2>Price history</h2><div id="ranges" class="ranges"><button type="button" data-range="session" aria-pressed="true">Session</button><button type="button" data-range="1D" hidden>1D</button><button type="button" data-range="5D" hidden>5D</button><button type="button" data-range="1M" hidden>1M</button><button type="button" data-range="6M" hidden>6M</button><button type="button" data-range="1Y" hidden>1Y</button></div></div>
+            <p id="chart-status" role="status" class="muted">Session observations start when a price arrives.</p>
+            <div class="plot"><svg id="chart" viewBox="0 0 900 250" role="img" aria-label="Price history" tabindex="0"><path id="chart-line" d="" /><line id="cursor" x1="0" y1="15" x2="0" y2="220" hidden /></svg><div class="axis"><span id="chart-high">-</span><span id="chart-low">-</span></div></div>
+            <div class="chart-foot"><span id="chart-start">-</span><output id="chart-value">Hover or use left/right arrow keys to inspect prices.</output><span id="chart-end">-</span></div>
+            <p class="caption">Session = up to 120 observations received while this page is open. Historical ranges require Finnhub candle access; timestamps use your local timezone.</p>
+        </section>
+        <dl id="stats" class="stats"></dl>
+        <section class="section"><div class="section-title"><h2>About the company</h2></div><p id="company-status" class="muted">Loading company information…</p><dl id="company-info" class="company-info"></dl></section>
+        <section id="company-news" class="section"><div class="section-title"><h2>Company news</h2></div><div id="stock-news"><p class="muted">Loading company news…</p></div></section>
+    </article>
+    <section id="watch-section" class="section"><div class="section-title"><h2>Your watchlist</h2><span id="watch-count">SAVED ON THIS DEVICE</span></div><p id="watch-empty" class="muted">Your watchlist is empty. Search for a stock and save it to follow it here.</p><div class="table-wrap"><table id="watch-table" hidden><caption class="sr-only">Saved stocks. Prices and changes come from Finnhub.</caption><thead><tr><th>Company</th><th>Last price</th><th>Day change</th><th>Data age</th><th>Manage</th></tr></thead><tbody id="watch-rows"></tbody></table></div><p id="storage-status" role="status" class="caption">Saved locally in this browser. No account required.</p></section>
+    <section id="recent-section" class="section"><div class="section-title"><h2>Recently viewed</h2></div><div id="recent" class="chips"></div></section>
+    <section id="discover" class="section"><div class="section-title"><h2>Start exploring</h2><span>SELECTED US COMPANIES - NOT A TRENDING RANKING</span></div><div id="explore-grid" class="chips explore-grid"><a href="/stock/AAPL"><strong>AAPL</strong><span>Apple</span></a><a href="/stock/MSFT"><strong>MSFT</strong><span>Microsoft</span></a><a href="/stock/NVDA"><strong>NVDA</strong><span>NVIDIA</span></a><a href="/stock/AMZN"><strong>AMZN</strong><span>Amazon</span></a><a href="/stock/GOOGL"><strong>GOOGL</strong><span>Alphabet</span></a><a href="/stock/META"><strong>META</strong><span>Meta</span></a><a href="/stock/TSLA"><strong>TSLA</strong><span>Tesla</span></a><a href="/stock/JPM"><strong>JPM</strong><span>JPMorgan Chase</span></a><a href="/stock/V"><strong>V</strong><span>Visa</span></a><a href="/stock/WMT"><strong>WMT</strong><span>Walmart</span></a><a href="/stock/XOM"><strong>XOM</strong><span>Exxon Mobil</span></a><a href="/stock/JNJ"><strong>JNJ</strong><span>Johnson & Johnson</span></a><a href="/stock/COST" class="explore-extra" hidden><strong>COST</strong><span>Costco</span></a><a href="/stock/NFLX" class="explore-extra" hidden><strong>NFLX</strong><span>Netflix</span></a><a href="/stock/AMD" class="explore-extra" hidden><strong>AMD</strong><span>AMD</span></a><a href="/stock/AVGO" class="explore-extra" hidden><strong>AVGO</strong><span>Broadcom</span></a><a href="/stock/KO" class="explore-extra" hidden><strong>KO</strong><span>Coca-Cola</span></a><a href="/stock/DIS" class="explore-extra" hidden><strong>DIS</strong><span>Disney</span></a><a href="/stock/HD" class="explore-extra" hidden><strong>HD</strong><span>Home Depot</span></a><a href="/stock/PG" class="explore-extra" hidden><strong>PG</strong><span>Procter & Gamble</span></a><a href="/stock/MA" class="explore-extra" hidden><strong>MA</strong><span>Mastercard</span></a><a href="/stock/BAC" class="explore-extra" hidden><strong>BAC</strong><span>Bank of America</span></a><a href="/stock/CRM" class="explore-extra" hidden><strong>CRM</strong><span>Salesforce</span></a><a href="/stock/ADBE" class="explore-extra" hidden><strong>ADBE</strong><span>Adobe</span></a></div><button id="more-stocks" type="button" aria-expanded="false" aria-controls="explore-grid">More stocks</button><p class="caption">Looking for another company? Use the stock search above.</p></section>
+    <section id="news-section" class="section"><div class="section-title"><h2>Market news</h2><span>FROM THE ORIGINAL PUBLISHERS</span></div><div id="news"><p class="muted">Loading market news…</p></div></section>
+    <noscript><p class="notice">Enable JavaScript for live prices, search, watchlists and charts.</p></noscript>
+</main>
+<footer class="footer">
+    <div class="footer-main">
+        <div class="footer-about"><a class="brand" href="/"><img asp-append-version="true" src="/images/stocklumo-mark.svg" width="32" height="32" alt="" />Stocklumo</a><p>Follow stocks, explore companies and keep your watchlist close. Built by Omar Hussain Fahmi with ASP.NET Core.</p></div>
+        <nav aria-label="Footer navigation"><h2>Explore</h2><a href="/">Dashboard</a><a href="/markets">Markets</a><a href="/watchlist">Watchlist</a><a href="/news">News</a></nav>
+        <div class="footer-contact"><h2>Get in touch</h2><a href="mailto:omarhussainfahmi@hotmail.com">omarhussainfahmi@hotmail.com</a><a class="contact-button" href="https://www.linkedin.com/in/omar-hussain-fahmi-830b62256" target="_blank" rel="noopener noreferrer">Connect on LinkedIn ↗</a></div>
+    </div>
+    <div class="footer-notes"><p>Market data by <a href="https://finnhub.io/" target="_blank" rel="noopener noreferrer">Finnhub ↗</a>. Availability and delays depend on the exchange and data access. For information only, not investment advice.</p><p>Your watchlist, recently viewed stocks and theme are saved in this browser. No Stocklumo account required.</p></div>
+    <div class="footer-bottom"><span>© @DateTime.UtcNow.Year Stocklumo</span><a href="#main">Back to top ↑</a></div>
+</footer>
+</body>
+</html>
+
+

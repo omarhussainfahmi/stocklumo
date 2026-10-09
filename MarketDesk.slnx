@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="MarketDesk.Tests/MarketDesk.Tests.csproj" />
+  <Project Path="MarketDesk/MarketDesk.csproj" />
+</Solution>

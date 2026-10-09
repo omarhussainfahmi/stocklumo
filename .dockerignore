@@ -1,0 +1,8 @@
+**
+!MarketDesk/
+!MarketDesk/**
+!Dockerfile
+MarketDesk/**/bin/
+MarketDesk/**/obj/
+MarketDesk/**/appsettings.*.local.json
+MarketDesk/**/*.user
