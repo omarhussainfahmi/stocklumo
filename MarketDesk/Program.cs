@@ -18,6 +18,7 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddHttpsRedirection(options => options.HttpsPort = 443);
 builder.Services.AddSingleton<MarketStore>();
 builder.Services.AddSingleton<FinnhubApi>();
+builder.Services.AddSingleton<ResearchService>();
 builder.Services.AddHttpClient("Finnhub", c =>
 {
     c.BaseAddress = new Uri("https://finnhub.io/api/v1/");

@@ -21,6 +21,9 @@
   let searchAbort;
   let searchTimer;
   let chartVersion = 0;
+  let marketOpen = null;
+  let spotlightLoading = false;
+  let lastSpotlightAttempt = 0;
   const number = (value) => typeof value === "number" && Number.isFinite(value);
   const price = (value) =>
     number(value)
@@ -112,9 +115,8 @@
       0,
       Math.floor((Date.now() - new Date(stock.updatedAt)) / 1000),
     );
-    return seconds < 60
-      ? `${seconds}s ago`
-      : `${Math.floor(seconds / 60)}m ago · stale`;
+    const elapsed = seconds < 60 ? `${seconds}s ago` : seconds < 3600 ? `${Math.floor(seconds / 60)}m ago` : seconds < 86400 ? `${Math.floor(seconds / 3600)}h ago` : `${Math.floor(seconds / 86400)}d ago`;
+    return elapsed + (seconds < 60 ? "" : marketOpen === false ? " · market closed" : " · stale");
   }
   function quote(stockSymbol, q) {
     if (
@@ -291,9 +293,12 @@
       } catch {
         return;
       }
+      if (typeof message.status !== "string" || !Array.isArray(message.stocks)) return;
       lastEvent = Date.now();
       connection(message.status, message.status === "connected" ? "STREAM CONNECTED" : message.status.toUpperCase());
-      $("notice").textContent = message.message;
+      $("notice").textContent = message.status === "connected" && marketOpen === false
+        ? "Stream connected. The US market is outside regular trading hours. Prices change only when Finnhub supplies a new trade or quote; the displayed time belongs to that price."
+        : message.message;
       for (const item of message.stocks) {
         const old = prices.get(item.symbol);
         if (
@@ -697,6 +702,8 @@
   } else if (page === "/markets") {
     $("page-title").textContent = "A wider view of the market.";
     $("watch-section").hidden = true;
+  } else if (["/screener", "/compare", "/portfolio", "/technical", "/earnings"].includes(page)) {
+    ["overview", "watch-section", "recent-section", "discover", "news-section"].forEach(id => $(id).hidden = true);
   }
   renderWatch();
   renderRecent();
@@ -709,6 +716,9 @@
     $("more-stocks").textContent = expanded ? "Fewer stocks" : "More stocks";
   };
   async function loadSpotlight() {
+    if (spotlightLoading) return;
+    spotlightLoading = true;
+    lastSpotlightAttempt = Date.now();
     $("ticker-stocks").replaceChildren();
     $("spotlight").replaceChildren();
     for (const ticker of ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META"]) {
@@ -741,6 +751,7 @@
       updatePrices();
     }
     connect();
+    spotlightLoading = false;
   }
   loadSpotlight();
   if (!$("news-section").hidden)
@@ -748,6 +759,7 @@
   function refreshMarketStatus() {
     return get("/api/data/status").then((result) => {
       const status = result.data;
+      marketOpen = result.state === "ok" && typeof status?.isOpen === "boolean" ? status.isOpen : null;
       $("market-status").textContent =
         result.state === "ok" && typeof status?.isOpen === "boolean"
           ? `US MARKET ${status.isOpen ? "OPEN" : "CLOSED"}${status.session ? " · " + status.session : ""}`
@@ -761,9 +773,19 @@
       connection("disconnected", "DISCONNECTED");
       $("notice").textContent =
         "No recent connection heartbeat. Displayed prices may be stale.";
+      if (Date.now() - lastStreamRecovery >= 60000) {
+        lastStreamRecovery = Date.now();
+        connect();
+      }
     }
+    if (spotlightSymbols.size < 6 && Date.now() - lastSpotlightAttempt >= 60000) loadSpotlight();
     updatePrices();
   }, 5000);
+  window.addEventListener("online", () => {
+    if (spotlightSymbols.size < 6) loadSpotlight();
+    else connect();
+    refreshMarketStatus();
+  });
   window.addEventListener("pagehide", () => {
     stream?.close();
     searchAbort?.abort();

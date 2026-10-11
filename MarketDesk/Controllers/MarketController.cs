@@ -14,7 +14,24 @@ public sealed class MarketController(MarketStore store) : Controller
     [HttpGet("/markets")]
     [HttpGet("/watchlist")]
     [HttpGet("/news")]
-    public IActionResult Section() => View("Index", store.Snapshot());
+    [HttpGet("/screener")]
+    [HttpGet("/compare")]
+    [HttpGet("/portfolio")]
+    [HttpGet("/technical")]
+    [HttpGet("/earnings")]
+    public IActionResult Section()
+    {
+        ViewData["Title"] = Request.Path.Value switch
+        {
+            "/screener" => "Stock screener",
+            "/compare" => "Compare stocks",
+            "/portfolio" => "Virtual portfolio",
+            "/technical" => "Technical analysis",
+            "/earnings" => "Earnings calendar",
+            _ => "Market watch"
+        };
+        return View("Index", store.Snapshot());
+    }
 
     [HttpGet("/stock/{symbol}")]
     public IActionResult Stock(string symbol)

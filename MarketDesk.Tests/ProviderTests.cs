@@ -8,6 +8,32 @@ namespace MarketDesk.Tests;
 
 public sealed class ProviderTests
 {
+    [Fact]
+    public async Task ResearchMetricsPreserveUnitsAndMissingFields()
+    {
+        using var handler = new FakeHandler(HttpStatusCode.OK, """
+            {"ticker":"TEST","name":"Test","currency":"USD","marketCapitalization":123,"c":50,"pc":40,"t":1700000000,"metric":{"10DayAverageTradingVolume":2.5,"peTTM":null}}
+            """);
+        using var api = CreateApi(handler);
+        var result = await new ResearchService(api).StockAsync("TEST", default);
+        Assert.Equal(50, result.Price);
+        Assert.Equal(25, result.ChangePercent);
+        Assert.Equal(123, result.MarketCapMillions);
+        Assert.Equal(2.5m, result.AverageVolumeMillions);
+        Assert.Null(result.PeTtm);
+        Assert.Null(result.Industry);
+    }
+
+    [Fact]
+    public async Task ResearchRejectsInvalidProfileWithoutFetchingMoreData()
+    {
+        using var handler = new FakeHandler(HttpStatusCode.OK, "[]");
+        using var api = CreateApi(handler);
+        var result = await new ResearchService(api).StockAsync("TEST", default);
+        Assert.Equal("unavailable", result.State);
+        Assert.Null(result.Price);
+        Assert.Equal(1, handler.Calls);
+    }
     [Theory]
     [InlineData("{\"ticker\":123}")]
     [InlineData("[]")]

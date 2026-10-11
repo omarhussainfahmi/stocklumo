@@ -15,7 +15,8 @@ function page({ missing = false, quoteWait, storedWatch = [], dashboard = false 
   const w = dom.window;
   w.document.body.dataset.symbol = dashboard ? "" : "AAPL";
   w.matchMedia = () => ({ matches: false });
-  w.setInterval = () => 0;
+  dom.timers = [];
+  w.setInterval = callback => { dom.timers.push(callback); return 0; };
   w.localStorage.setItem("stocklumo.watch", JSON.stringify(storedWatch));
   const streams = [];
   w.EventSource = class {
@@ -259,4 +260,22 @@ test("missing credentials never create prices or allow an unverified watchlist e
     "API key required",
   );
   dom.window.close();
+});
+test("a stalled stream is replaced and closed-market prices are explained", async () => {
+  const dom = page({dashboard:true}); await settle();
+  const old = dom.streams.at(-1), now = dom.window.Date.now();
+  dom.window.Date.now = () => now + 61000;
+  dom.timers.at(-1)();
+  assert.equal(old.closed,true); assert.notEqual(dom.streams.at(-1),old);
+  dom.streams.at(-1).onmessage({data:JSON.stringify({status:'connected',message:'Connected',stocks:[{symbol:'AAPL',price:100,updatedAt:'2020-01-01T00:00:00Z'}]})});
+  assert.match(dom.window.document.getElementById('notice').textContent,/outside regular trading hours/);
+  assert.match(dom.window.document.querySelector('#ticker-stocks .age').textContent,/market closed/);
+  dom.window.close();
+});
+test("failed ticker initialization retries and starts streaming when profiles recover",async()=>{
+  const dom=page({missing:true,dashboard:true});await settle();
+  dom.window.fetch=async url=>({ok:true,json:async()=>url.endsWith('/profile')?{state:'ok',data:{ticker:url.split('/')[4],currency:'USD',name:'Fixture'}}:{state:'ok',data:{c:100,pc:90,t:1700000000}}});
+  const now=dom.window.Date.now();dom.window.Date.now=()=>now+61000;dom.timers.at(-1)();await settle();
+  assert.match(decodeURIComponent(dom.streams.at(-1).url),/META/);
+  assert.match(dom.window.document.querySelector('#ticker-stocks .last').textContent,/100/);dom.window.close();
 });

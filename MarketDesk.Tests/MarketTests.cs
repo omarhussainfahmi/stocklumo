@@ -236,6 +236,11 @@ public sealed class MarketTests
     [InlineData("/markets")]
     [InlineData("/watchlist")]
     [InlineData("/news")]
+    [InlineData("/screener")]
+    [InlineData("/compare")]
+    [InlineData("/portfolio")]
+    [InlineData("/technical")]
+    [InlineData("/earnings")]
     [InlineData("/stock/AAPL")]
     public async Task ProductPagesRenderConsistentBranding(string path)
     {
@@ -248,6 +253,8 @@ public sealed class MarketTests
 
     [Theory]
     [InlineData("/api/data/search?q=")]
+    [InlineData("/api/research/stock/AAPL")]
+    [InlineData("/api/research/earnings/AAPL/reported")]
     [InlineData("/api/data/stock/AAPL/profile")]
     [InlineData("/api/data/status")]
     public async Task MissingKeyReturnsUsableStates(string path)
@@ -261,6 +268,9 @@ public sealed class MarketTests
 
     [Theory]
     [InlineData("/api/data/stock/AAPL/chart?range=invalid")]
+    [InlineData("/api/research/earnings?from=1900-01-01&to=2099-01-01")]
+    [InlineData("/api/research/earnings?from=invalid&to=invalid")]
+    [InlineData("/api/research/stock/invalid")]
     [InlineData("/api/data/stock/%3Cscript%3E/profile")]
     [InlineData("/api/market/stream?symbols=BINANCE%3ABTCUSDT")]
     public async Task InvalidDataRequestsAreRejected(string path)

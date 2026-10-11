@@ -11,6 +11,17 @@
   --accent: #e7f5f0;
   --shadow: #081b3012;
 }
+.research-nav { display: flex; flex-wrap: wrap; gap: 12px 24px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.research-nav a { font-size: 14px; }
+.research-controls { display: flex; align-items: end; flex-wrap: wrap; gap: 16px; margin: 24px 0; }
+.research-controls label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; flex: 1 1 180px; }
+.research-controls input, .research-controls select { width: 100%; min-height: 42px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); padding: 8px 10px; font: inherit; }
+#research-results { min-width: 0; }
+#research-results td { font-variant-numeric: tabular-nums; }
+.research-chart { width: 100%; min-height: 180px; background: var(--panel); border: 1px solid var(--line); }
+.research-chart path { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.series-0 { stroke: var(--green); } .series-1 { stroke: #558ce6; } .series-2 { stroke: #bd789e; } .series-3 { stroke: #bd8529; } .series-4 { stroke: #83979b; }
+.series-label-0 { color: var(--green); } .series-label-1 { color: #558ce6; } .series-label-2 { color: #bd789e; } .series-label-3 { color: #bd8529; } .series-label-4 { color: #83979b; }
 :root[data-theme="dark"] {
   color-scheme: dark;
   --paper: #071728;
@@ -58,6 +69,8 @@ button[aria-pressed="true"] {
 a:focus-visible,
 button:focus-visible,
 input:focus-visible,
+select:focus-visible,
+summary:focus-visible,
 svg:focus-visible {
   outline: 2px solid var(--green);
   outline-offset: 4px;
