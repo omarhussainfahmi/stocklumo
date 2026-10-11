@@ -170,3 +170,6 @@ Run `dotnet test MarketDesk.slnx -c Release`, `npm test`, and `dotnet format Mar
 Keep `Finnhub__ApiKey` in Render's secret environment variables. Push the tested source to the connected `main` branch; Render builds the existing Dockerfile on the Free plan. Verify `/health`, all five new page routes, research API responses and SSE after Render reports a successful deployment. Stop local instances using the same key before production verification because Finnhub allows only one upstream stream per key. No migration, scheduled background job or paid storage is needed.
 
 The free address remains https://stocklumo.onrender.com. A custom `www.stocklumo.com` address requires domain ownership and DNS configuration; no domain was purchased, as requested.
+
+Deployment verification completed on 11 October 2026: commit 4d49e80 is Live on Render Free and GitHub workflow 38145691526 passed. All 60 backend and 25 frontend tests pass. Formatting, npm audit and .NET dependency scans passed. Public health, five new routes, research and earnings APIs, security headers and credential-isolation checks passed. The published screener loaded all 12 companies, and SSE delivered advancing heartbeats with genuine Friday quote timestamps during the closed Sunday market.
+
