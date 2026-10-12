@@ -18,7 +18,6 @@ public sealed class MarketController(MarketStore store) : Controller
     [HttpGet("/screener")]
     [HttpGet("/compare")]
     [HttpGet("/portfolio")]
-    [HttpGet("/technical")]
     [HttpGet("/earnings")]
     public IActionResult Section()
     {
@@ -27,7 +26,6 @@ public sealed class MarketController(MarketStore store) : Controller
             "/screener" => "Stock screener",
             "/compare" => "Compare stocks",
             "/portfolio" => "Virtual portfolio",
-            "/technical" => "Technical analysis",
             "/earnings" => "Earnings calendar",
             _ => "Market watch"
         };

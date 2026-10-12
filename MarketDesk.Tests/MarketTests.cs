@@ -276,7 +276,10 @@ public sealed class MarketTests
         using var response = await client.GetAsync("/");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("max-age=", response.Headers.GetValues("Strict-Transport-Security").Single());
-        Assert.Contains("Stocklumo", await response.Content.ReadAsStringAsync());
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Stocklumo", html);
+        Assert.DoesNotContain("/technical", html);
+        Assert.DoesNotContain("Technical analysis", html);
     }
 
     [Fact]
@@ -333,7 +336,6 @@ public sealed class MarketTests
     [InlineData("/screener")]
     [InlineData("/compare")]
     [InlineData("/portfolio")]
-    [InlineData("/technical")]
     [InlineData("/earnings")]
     [InlineData("/stock/AAPL")]
     public async Task ProductPagesRenderConsistentBranding(string path)
@@ -342,7 +344,21 @@ public sealed class MarketTests
         using var client = app.CreateClient();
         using var response = await client.GetAsync(path);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("Stocklumo", await response.Content.ReadAsStringAsync());
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Stocklumo", html);
+        Assert.DoesNotContain("/technical", html);
+        Assert.DoesNotContain("Technical analysis", html);
+    }
+
+    [Theory]
+    [InlineData("/technical")]
+    [InlineData("/technical/")]
+    public async Task DisabledTechnicalPageIsNotAccessible(string path)
+    {
+        await using var app = CreateApp();
+        using var client = app.CreateClient();
+        using var response = await client.GetAsync(path);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Theory]

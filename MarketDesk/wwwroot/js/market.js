@@ -773,7 +773,7 @@
   } else if (page === "/markets") {
     $("page-title").textContent = "A wider view of the market.";
     $("watch-section").hidden = true;
-  } else if (["/screener", "/compare", "/portfolio", "/technical", "/earnings"].includes(page)) {
+  } else if (["/screener", "/compare", "/portfolio", "/earnings"].includes(page)) {
     ["overview", "watch-section", "recent-section", "discover", "news-section"].forEach(id => $(id).hidden = true);
   }
   renderWatch();

@@ -146,18 +146,17 @@ Run one instance, and stop local live-feed sessions using the same Finnhub key b
 
 ## Research expansion - 11 October 2026
 
-The existing MVC/Razor architecture, shared Finnhub request budget, streaming feed and branding remain in place. New navigation exposes:
+The existing MVC/Razor architecture, shared Finnhub request budget, streaming feed and branding remain in place. Currently available navigation exposes:
 
 1. `/screener`: filter 12 explicitly selected US companies by name/ticker, minimum price, day percentage change, Finnhub industry, market cap and 10-day average volume; sort, reset and save/load one local preset. This is not a full-exchange screener. Missing metrics fail numeric filters. Market cap is USD millions; average volume is millions of shares, not current-day volume. Only USD quotes enter the price-filter universe.
 2. `/compare`: compare 2-5 symbols with currency-labeled prices, TTM P/E and dividend yield, and USD market cap. Historical charts intersect common timestamps across all selected stocks and normalize each series to 100 on the first common date. They measure local-currency price performance, not total return or FX-adjusted performance.
 3. `/portfolio`: add/edit/remove up to 20 hypothetical lots across 10 symbols, with quantity, purchase price and purchase date. Cost basis, value, unrealized P/L and allocation are grouped by currency. Missing or pre-purchase quotes suppress complete totals. Holdings stay in localStorage, not Render's ephemeral disk; clearing browser data removes them. Valuations refresh every 60 seconds while visible. Historical P/L requires common daily prices after all purchase dates within one year and assumes continuous holdings; fees, dividends, corporate actions and currency conversions are excluded. No brokerage or trade execution exists.
-4. `/technical`: configurable SMA, EMA, Wilder RSI, MACD/signal/difference and candle volume. Calculations use daily historical candles only. SMA/EMA warm up with a complete window; EMA starts with SMA. RSI requires one more close than its period, uses Wilder smoothing, and returns 50 for an entirely flat window. MACD omits unavailable warm-up points. Volume is never inferred from price ticks. Accessible date/value tables accompany charts.
-5. `/earnings`: upcoming calendar with ticker/watchlist filters and latest four reported quarters per selected ticker or watchlist. Announcement date and fiscal period are separate concepts. Estimates, actuals and missing fields are labeled. Earnings endpoints do not identify currency, so values are not summed or treated as comparable across companies.
-6. Ticker/spotlight recovery: retry failed initial profiles after a minute, reconnect a stream whose heartbeat stops (bounded to once a minute), and reconnect on browser network recovery. Closed-market quotes show elapsed age and a market-closed explanation. No timer manufactures price changes.
+4. `/earnings`: upcoming calendar with ticker/watchlist filters and latest four reported quarters per selected ticker or watchlist. Announcement date and fiscal period are separate concepts. Estimates, actuals and missing fields are labeled. Earnings endpoints do not identify currency, so values are not summed or treated as comparable across companies.
+5. Ticker/spotlight recovery: retry failed initial profiles after a minute, reconnect a stream whose heartbeat stops (bounded to once a minute), and reconnect on browser network recovery. Closed-market quotes show elapsed age and a market-closed explanation. No timer manufactures price changes.
 
 ### Provider verification and limits
 
-Authenticated checks on 11 October 2026 returned HTTP 200 for `quote`, `stock/profile2`, `stock/metric`, `calendar/earnings`, `stock/earnings` and `stock/market-status`. `stock/candle` returned HTTP 403 with the current key. Consequently normalized history, historical portfolio P/L and technical charts cannot display real historical results on this subscription. Implementations are tested using explicit synthetic test fixtures; the production interface instead explains the missing access. Upgrading provider access is not required or purchased. No alternate or invented data source is used.
+Authenticated checks on 11 October 2026 returned HTTP 200 for `quote`, `stock/profile2`, `stock/metric`, `calendar/earnings`, `stock/earnings` and `stock/market-status`. `stock/candle` returned HTTP 403 with the current key. Consequently normalized history, historical portfolio P/L cannot display real historical results on this subscription. Implementations are tested using explicit synthetic test fixtures; the production interface instead explains the missing access. Upgrading provider access is not required or purchased. No alternate or invented data source is used.
 
 The provider reported the US market closed during verification; quotes retained Friday 9 October timestamps. Live SSE connectivity is separate from the existence of new trades. A continuously connected stream does not guarantee continuously changing prices. Changes during an open trading session cannot be verified on a Sunday.
 
@@ -167,7 +166,7 @@ The provider reported the US market closed during verification; quotes retained 
 
 Run `dotnet test MarketDesk.slnx -c Release`, `npm test`, and `dotnet format MarketDesk.slnx --verify-no-changes --no-restore`. Browser checks cover desktop/mobile layouts, real screener and comparison values, hypothetical holding persistence/removal, restricted historical data and actual earnings responses. Existing watchlist, chart and news behavior retains regression coverage. These checks are not an independent penetration test.
 
-Keep `Finnhub__ApiKey` in Render's secret environment variables. Push the tested source to the connected `main` branch; Render builds the existing Dockerfile on the Free plan. Verify `/health`, all five new page routes, research API responses and SSE after Render reports a successful deployment. Stop local instances using the same key before production verification because Finnhub allows only one upstream stream per key. No migration, scheduled background job or paid storage is needed.
+Keep `Finnhub__ApiKey` in Render's secret environment variables. Push the tested source to the connected `main` branch; Render builds the existing Dockerfile on the Free plan. Verify `/health`, all four available research page routes, research API responses and SSE after Render reports a successful deployment. Stop local instances using the same key before production verification because Finnhub allows only one upstream stream per key. No migration, scheduled background job or paid storage is needed.
 
 The free address remains https://stocklumo.onrender.com. A custom `www.stocklumo.com` address requires domain ownership and DNS configuration; no domain was purchased, as requested.
 
@@ -248,3 +247,17 @@ regular-session trade during this pre-market investigation. No 401/403/429 quote
 failures were observed in the production sample; their handling is covered by tests.
 After a Render restart the in-memory catalog reloads from REST, which may still
 report the last regular close until another streamed trade arrives.
+
+
+## Technical Analysis disabled - 12 October 2026
+
+Technical Analysis is no longer a public feature because the configured Finnhub
+subscription does not provide the required historical candles. Its navigation link,
+page route and indicator controls have been removed. Direct requests to `/technical`
+return HTTP 404. No additional provider probes or substitute market data are used.
+
+The reusable SMA, EMA, Wilder RSI and MACD functions in `research-math.js` and their
+calculation tests are retained for future development. Shared candle parsing,
+chart rendering, Finnhub services and configuration remain in use by stock details,
+comparison and portfolio pages. No feature-specific dependency or service needed
+removal. Reintroduce the page only after suitable historical data access is confirmed.

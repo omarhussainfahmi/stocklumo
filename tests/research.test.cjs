@@ -232,32 +232,23 @@ test("MACD aligns signal and histogram after warm-up", () => {
   assert.equal(data.histogram[5], 0);
   assert.throws(() => math.macd([], 5, 3, 2));
 });
-test("technical UI explains provider restrictions without rendering a fabricated chart", async () => {
+test("disabled technical route has no navigation or controls and makes no research requests", () => {
   const dom = new JSDOM(
-      readFileSync("MarketDesk/Views/Market/Index.cshtml", "utf8"),
-      { url: "https://example.test/technical", runScripts: "outside-only" },
-    ),
-    w = dom.window;
-  w.StocklumoMath = math;
-  w.fetch = async () => ({
-    ok: true,
-    json: async () => ({
-      state: "unavailable",
-      message: "Candle access restricted",
-    }),
-  });
-  w.eval(readFileSync("MarketDesk/wwwroot/js/research.js", "utf8"));
-  [...w.document.querySelectorAll("button")]
-    .find((b) => b.textContent === "Calculate indicator")
-    .click();
-  await new Promise((r) => setTimeout(r, 20));
-  assert.match(
-    w.document.querySelector("#research-status").textContent,
-    /restricted/,
+    readFileSync("MarketDesk/Views/Market/Index.cshtml", "utf8"),
+    { url: "https://example.test/technical", runScripts: "outside-only" },
   );
-  assert.equal(w.document.querySelectorAll(".research-chart").length, 0);
+  const w = dom.window;
+  w.StocklumoMath = math;
+  let requests = 0;
+  w.fetch = () => { requests++; throw new Error("Disabled feature requested data"); };
+  w.eval(readFileSync("MarketDesk/wwwroot/js/research.js", "utf8"));
+  assert.equal(w.document.querySelector('a[href="/technical"]'), null);
+  assert.equal(w.document.querySelector("#research").hidden, true);
+  assert.equal(w.document.querySelector("#research-controls").children.length, 0);
+  assert.equal(requests, 0);
   w.close();
 });
+
 test("earnings filters the watchlist and preserves missing actuals instead of zero", async () => {
   const dom = new JSDOM(
       readFileSync("MarketDesk/Views/Market/Index.cshtml", "utf8"),

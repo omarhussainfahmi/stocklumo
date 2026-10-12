@@ -7,7 +7,6 @@
       "/screener",
       "/compare",
       "/portfolio",
-      "/technical",
       "/earnings",
     ].includes(page)
   )
@@ -681,118 +680,6 @@
     });
   }
   if (page === "/portfolio") portfolio();
-  function technical() {
-    $("research-title").textContent = "Technical analysis";
-    $("research-description").textContent =
-      "Optional indicators from up to one year of daily Finnhub closing prices. SMA smooths prices; EMA weights recent prices more heavily. Wilder RSI measures the balance of gains and losses (0-100). MACD compares two EMAs with a signal line and their difference. Volume is shares traded per candle. These are descriptive calculations, not trading advice.";
-    const ticker = field("Ticker", "text", "AAPL"),
-      kind = select("Indicator", [
-        ["sma", "Simple moving average"],
-        ["ema", "Exponential moving average"],
-        ["rsi", "RSI (Wilder)"],
-        ["macd", "MACD"],
-        ["volume", "Volume"],
-      ]);
-    ticker.maxLength = 15;
-    const length = field("SMA / EMA / RSI period", "number", "14"),
-      fast = field("MACD fast period", "number", "12"),
-      slow = field("MACD slow period", "number", "26"),
-      signal = field("MACD signal period", "number", "9");
-    [length, fast, slow, signal].forEach((i) => {
-      i.min = 2;
-      i.max = 200;
-      i.step = 1;
-    });
-    function configure() {
-      length.parentElement.hidden = ["volume", "macd"].includes(kind.value);
-      [fast, slow, signal].forEach(
-        (i) => (i.parentElement.hidden = kind.value !== "macd"),
-      );
-    }
-    kind.onchange = configure;
-    configure();
-    const run = button("Calculate indicator", async () => {
-      let symbol;
-      try {
-        [symbol] = symbols(ticker.value, 1, 1);
-        if (kind.value === "macd")
-          math.macd(
-            [],
-            Number(fast.value),
-            Number(slow.value),
-            Number(signal.value),
-          );
-        else if (kind.value !== "volume") math.sma([], Number(length.value));
-      } catch (e) {
-        status.textContent = e.message;
-        return;
-      }
-      setBusy(run, true);
-      results.replaceChildren();
-      status.textContent = "Loading daily price history...";
-      const response = await get(`/api/data/stock/${symbol}/chart?range=1Y`),
-        points = math.candles(response.data),
-        values = points.map((p) => p.value);
-      if (!points.length) {
-        status.textContent =
-          response.message ||
-          "Reliable daily history unavailable. Indicators cannot be calculated.";
-        setBusy(run, false);
-        return;
-      }
-      const make = (name, values) => ({
-        name,
-        points: points.flatMap((p, i) =>
-          math.finite(values[i]) ? [{ time: p.time, value: values[i] }] : [],
-        ),
-      });
-      let series;
-      if (kind.value === "macd") {
-        const data = math.macd(
-          values,
-          Number(fast.value),
-          Number(slow.value),
-          Number(signal.value),
-        );
-        series = [
-          make("MACD", data.line),
-          make("Signal", data.signal),
-          make("MACD minus signal", data.histogram),
-        ];
-      } else if (kind.value === "volume") {
-        if (points.some((p) => p.volume === null)) {
-          status.textContent =
-            "Volume unavailable for one or more candles. No volume is inferred from price ticks.";
-          setBusy(run, false);
-          return;
-        }
-        series = [
-          make(
-            "Volume (shares)",
-            points.map((p) => p.volume),
-          ),
-        ];
-      } else {
-        series = [
-          make(
-            `${kind.value.toUpperCase()} (${length.value})`,
-            math[kind.value](values, Number(length.value)),
-          ),
-        ];
-        if (["sma", "ema"].includes(kind.value))
-          series.unshift({ name: "Closing price", points });
-      }
-      if (series.some((s) => s.points.length < 2))
-        status.textContent =
-          "Insufficient history for the selected periods. Reduce the periods or use a data plan with more history.";
-      else {
-        plot(series, `${symbol}: ${kind.options[kind.selectedIndex].text}`);
-        status.textContent = `Calculated from ${points.length} daily closing observations; warm-up values are omitted. RSI is 50 for a completely flat window. MACD and averages use quote-currency units.`;
-      }
-      setBusy(run, false);
-    });
-  }
-  if (page === "/technical") technical();
   function earnings() {
     $("research-title").textContent = "Earnings calendar";
     $("research-description").textContent =
