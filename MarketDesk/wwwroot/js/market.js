@@ -89,13 +89,10 @@
       : "-";
   const stamp = (value) =>
     new Date(value).toLocaleString([], {
-      year: "numeric",
       month: "short",
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-      second: "2-digit",
-      timeZoneName: "short",
     });
   function element(tag, text, className) {
     const node = document.createElement(tag);
@@ -171,7 +168,7 @@
       Math.floor((now() - new Date(stock.updatedAt)) / 1000),
     );
     const elapsed = seconds < 60 ? `${seconds}s ago` : seconds < 3600 ? `${Math.floor(seconds / 60)}m ago` : seconds < 86400 ? `${Math.floor(seconds / 3600)}h ago` : `${Math.floor(seconds / 86400)}d ago`;
-    return `${elapsed} - ${freshness(stock)} - ${stamp(stock.updatedAt)}`;
+    return `${elapsed} - ${freshness(stock)}\n${new Date(stock.updatedAt).toISOString().slice(0, 19).replace("T", " ")} UTC`;
   }
   function quote(stockSymbol, q) {
     if (

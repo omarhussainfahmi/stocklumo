@@ -212,7 +212,7 @@ be stale without a transport failure. Unknown exchange calendars/entitlements ar
 not inferred from a company's headquarters. Delayed coverage is not assigned an
 invented delay duration. Market-status checks expire after two minutes and reject
 provider status timestamps older than three minutes. Absolute price date/time and
-local timezone are displayed; future values beyond one minute are rejected.
+UTC are displayed; future values beyond one minute are rejected.
 
 Keep one application instance per Finnhub key: Finnhub documents a single upstream
 WebSocket connection per key. Do not run a credentialed local instance alongside
