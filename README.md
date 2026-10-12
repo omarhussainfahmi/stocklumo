@@ -230,3 +230,21 @@ while Finnhub supplies trades; synthetic fixtures are used only in automated tes
 
 References: [Finnhub streaming contract](https://finnhub.io/docs/api/websocket-trades),
 [NYSE hours and holiday calendar](https://www.nyse.com/trade/hours-calendars).
+
+
+Production verification: Render deployed `012a0735afaef671b79c8d6d53adb8ab82a0e3d4`
+on 12 October 2026; GitHub Actions run `38244119752` passed. A subsequent 40-second
+SSE capture (11:41:11-11:41:50 UTC) contained 40 frames and six active subscriptions.
+It included a genuine MSFT trade at 537.45, provider time
+`2026-10-12T11:41:18.246Z`, received at `2026-10-12T11:41:18.3415955Z`.
+The browser ticker and stock-detail view displayed that updated price/time.
+Regular-market status remained CLOSED/pre-market, so the page did not claim LIVE.
+An earlier NVDA update also advanced its browser price to 228.90 during pre-market.
+Direct GET and Google-referrer GET returned identical HTML, both HTTP 200 with
+no-store/no-cache. Desktop and 390px mobile checks showed no console errors; the
+mobile document width and scroll width matched (375px content plus scrollbar).
+The complete regular-session LIVE transition was tested with fixtures, not a real
+regular-session trade during this pre-market investigation. No 401/403/429 quote
+failures were observed in the production sample; their handling is covered by tests.
+After a Render restart the in-memory catalog reloads from REST, which may still
+report the last regular close until another streamed trade arrives.
