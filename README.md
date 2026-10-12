@@ -156,7 +156,7 @@ The existing MVC/Razor architecture, shared Finnhub request budget, streaming fe
 
 ### Provider verification and limits
 
-Authenticated checks on 11 October 2026 returned HTTP 200 for `quote`, `stock/profile2`, `stock/metric`, `calendar/earnings`, `stock/earnings` and `stock/market-status`. `stock/candle` returned HTTP 403 with the current key. Consequently normalized history, historical portfolio P/L cannot display real historical results on this subscription. Implementations are tested using explicit synthetic test fixtures; the production interface instead explains the missing access. Upgrading provider access is not required or purchased. No alternate or invented data source is used.
+Authenticated checks on 11 October 2026 returned HTTP 200 for `quote`, `stock/profile2`, `stock/metric`, `calendar/earnings`, `stock/earnings` and `stock/market-status`. `stock/candle` returned HTTP 403 with the current key. Consequently normalized history and historical portfolio P/L cannot display real historical results on this subscription. Implementations are tested using explicit synthetic test fixtures; the production interface instead explains the missing access. Upgrading provider access is not required or purchased. No alternate or invented data source is used.
 
 The provider reported the US market closed during verification; quotes retained Friday 9 October timestamps. Live SSE connectivity is separate from the existence of new trades. A continuously connected stream does not guarantee continuously changing prices. Changes during an open trading session cannot be verified on a Sunday.
 
@@ -261,3 +261,10 @@ calculation tests are retained for future development. Shared candle parsing,
 chart rendering, Finnhub services and configuration remain in use by stock details,
 comparison and portfolio pages. No feature-specific dependency or service needed
 removal. Reintroduce the page only after suitable historical data access is confirmed.
+
+Removal verification: `dotnet build -c Release` completed with zero warnings and
+zero errors; `dotnet test -c Release --no-build` passed 68 tests; `npm test` passed
+29 tests. Formatting and diff checks passed. Render deployed commit `0880f9a`.
+Production checks returned 200 for the dashboard, markets, watchlist, news,
+stock details, screener, comparison, portfolio and earnings pages, with no Technical
+Analysis navigation link. Both `/technical` and `/technical/` returned 404.
