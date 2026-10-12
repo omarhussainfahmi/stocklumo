@@ -12,6 +12,57 @@
   let recent = readList("stocklumo.recent");
   let profile = {};
   let stream;
+  let pageActive = true;
+  let initializationError = false;
+  const isUsExchange = profile => typeof profile?.exchange === "string" && /^(NASDAQ|NEW YORK STOCK EXCHANGE|NYSE|NYSE ARCA|NYSE AMERICAN)(?:$|[ /,])/.test(profile.exchange);
+  let subscribedSymbols = [];
+  let transport = "connecting";
+  let streamMessage = "Establishing the connection. No fresh trade has been confirmed.";
+  let marketCheckedAt = 0;
+  let clockOffset = 0;
+  const now = () => Date.now() + clockOffset;
+  // Application freshness windows, not an exchange latency guarantee. Only received
+  // US trades qualify for LIVE. REST has a 60s shared cache and a 5s polling cycle.
+  const tradeWindow = 120000;
+  const quoteWindow = 180000;
+  const usOpen = () => Date.now() - marketCheckedAt < 120000 ? marketOpen : null;
+  function freshness(stock) {
+    const timestamp = Date.parse(stock?.updatedAt);
+    if (!number(stock?.price) || stock.price <= 0 || !Number.isFinite(timestamp)) return "unavailable";
+    if (timestamp > now() + 60000) return "error";
+    if (stock.usMarket && usOpen() === false) return "market closed";
+    const age = now() - timestamp;
+    const received = Date.parse(stock.tradeReceivedAt);
+    if (transport === "connected" && stock.usMarket && usOpen() === true && stock.source === "Trade" &&
+        age <= tradeWindow && Number.isFinite(received) && now() - received <= tradeWindow && received <= now() + 60000) return "live";
+    if (age > (stock.source === "Trade" ? tradeWindow : quoteWindow)) return "stale";
+    return "recent quote";
+  }
+  function renderFeedState() {
+    if (!stream || !pageActive) return;
+    const items = subscribedSymbols.map(symbol => prices.get(symbol) || { symbol });
+    let state = transport, text = transport.toUpperCase(), detail = streamMessage;
+    const failures = items.filter(item => ["error", "limited", "unavailable", "setup"].includes(item.quoteState));
+    if (transport === "setup" || transport === "error") { state = "error"; text = "ERROR"; }
+    else if (transport === "connected") {
+      if (failures.length) {
+        state = "error"; text = "ERROR";
+        detail = "Quote refresh failed for " + failures.map(item => item.symbol).join(", ") + ". Retrying within the shared provider limit; retained prices keep their original timestamps.";
+      } else if (usOpen() === false) {
+        state = "closed"; text = "MARKET CLOSED";
+        detail = "US market is outside regular trading hours. Prices may remain at the last close until Finnhub supplies new data. Extended-hours availability depends on provider access.";
+      } else if (items.some(item => freshness(item) === "live")) {
+        state = "live"; text = "LIVE";
+        detail = "Fresh US trade data received. This applies only to stocks marked live; check each stock's timestamp.";
+      } else {
+        state = "stale"; text = "STALE";
+        detail = usOpen() === null ? "Market hours could not be verified. No live-data claim can be made." : "No qualifying fresh trade received. REST quotes continue to refresh; old prices are retained honestly.";
+      }
+    }
+    connection(state, text);
+    $("connection").title = "Upstream connection: " + transport;
+    $("notice").textContent = detail + " Connection: " + transport + ". Data access may be limited or delayed; a connected socket is not proof of fresh prices.";
+  }
   let lastEvent = Date.now();
   let lastStreamRecovery = 0;
   let chartPoints = [];
@@ -38,10 +89,13 @@
       : "-";
   const stamp = (value) =>
     new Date(value).toLocaleString([], {
+      year: "numeric",
       month: "short",
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+      second: "2-digit",
+      timeZoneName: "short",
     });
   function element(tag, text, className) {
     const node = document.createElement(tag);
@@ -83,6 +137,7 @@
     try {
       const response = await fetch(path, {
         signal,
+        cache: "no-store",
         headers: { Accept: "application/json" },
       });
       if (!response.ok)
@@ -110,13 +165,13 @@
     node.classList.toggle("down", number(value) && value < 0);
   }
   function age(stock) {
-    if (!stock?.updatedAt) return "Unavailable";
+    if (!stock?.updatedAt) return stock?.quoteState && stock.quoteState !== "pending" ? "Unavailable - " + stock.quoteState : "Unavailable";
     const seconds = Math.max(
       0,
-      Math.floor((Date.now() - new Date(stock.updatedAt)) / 1000),
+      Math.floor((now() - new Date(stock.updatedAt)) / 1000),
     );
     const elapsed = seconds < 60 ? `${seconds}s ago` : seconds < 3600 ? `${Math.floor(seconds / 60)}m ago` : seconds < 86400 ? `${Math.floor(seconds / 3600)}h ago` : `${Math.floor(seconds / 86400)}d ago`;
-    return elapsed + (seconds < 60 ? "" : marketOpen === false ? " · market closed" : " · stale");
+    return `${elapsed} - ${freshness(stock)} - ${stamp(stock.updatedAt)}`;
   }
   function quote(stockSymbol, q) {
     if (
@@ -125,12 +180,12 @@
       q.c <= 0 ||
       !number(q.t) ||
       q.t <= 0 ||
-      q.t > 253402300799
+      q.t * 1000 > now() + 60000
     )
       return;
     const old = prices.get(stockSymbol) || {};
     const newer =
-      !old.updatedAt || q.t * 1000 >= new Date(old.updatedAt).getTime();
+      !old.updatedAt || q.t * 1000 > new Date(old.updatedAt).getTime() || (q.t * 1000 === new Date(old.updatedAt).getTime() && old.source !== "Trade");
     const current = newer ? q.c : old.price;
     const updatedAt = newer
       ? new Date(q.t * 1000).toISOString()
@@ -144,6 +199,8 @@
       high: q.h,
       low: q.l,
       updatedAt,
+      source: newer ? "Quote" : old.source,
+      quoteState: "ok",
       change: q.pc > 0 ? current - q.pc : null,
       changePercent: q.pc > 0 ? ((current - q.pc) / q.pc) * 100 : null,
     });
@@ -161,6 +218,7 @@
       );
       row.querySelector(".age").textContent = age(item);
     });
+    renderFeedState();
     if (!symbol) return;
     const item = prices.get(symbol);
     if (!item) return;
@@ -268,6 +326,7 @@
     $("connection").textContent = text;
   }
   function connect() {
+    if (!pageActive) return;
     stream?.close();
     stream = undefined;
     const symbols = [
@@ -277,30 +336,38 @@
         ...spotlightSymbols,
       ]),
     ].slice(0, 27);
+    subscribedSymbols = symbols;
     if (!symbols.length) {
-      connection("idle", "NO LIVE SUBSCRIPTIONS");
+      connection(initializationError ? "error" : "idle", initializationError ? "ERROR" : "NO LIVE SUBSCRIPTIONS");
       return;
     }
+    transport = "connecting";
     connection("connecting", "CONNECTING");
     lastEvent = Date.now();
     stream = new EventSource(
       "/api/market/stream?symbols=" + encodeURIComponent(symbols.join(",")),
     );
+    const currentStream = stream;
     stream.onmessage = (event) => {
+      if (!pageActive || stream !== currentStream) return;
       let message;
       try {
         message = JSON.parse(event.data);
       } catch {
         return;
       }
-      if (typeof message.status !== "string" || !Array.isArray(message.stocks)) return;
+      if (!message || typeof message.status !== "string" || !Array.isArray(message.stocks)) return;
       lastEvent = Date.now();
-      connection(message.status, message.status === "connected" ? "STREAM CONNECTED" : message.status.toUpperCase());
-      $("notice").textContent = message.status === "connected" && marketOpen === false
-        ? "Stream connected. The US market is outside regular trading hours. Prices change only when Finnhub supplies a new trade or quote; the displayed time belongs to that price."
-        : message.message;
+      transport = message.status;
+      streamMessage = message.message || "Provider status unavailable.";
+      const serverTime = Date.parse(message.serverTime);
+      if (Number.isFinite(serverTime)) clockOffset = serverTime - Date.now();
       for (const item of message.stocks) {
+        if (!item || !symbols.includes(item.symbol)) continue;
+        const time = Date.parse(item.updatedAt);
         const old = prices.get(item.symbol);
+        if (item.quoteState) prices.set(item.symbol, { ...old, symbol: item.symbol, quoteState: item.quoteState });
+        if (!number(item.price) || item.price <= 0 || !Number.isFinite(time) || time > now() + 60000) continue;
         if (
           !old?.updatedAt ||
           (item.updatedAt &&
@@ -311,6 +378,9 @@
       updatePrices();
     };
     stream.onerror = () => {
+      if (!pageActive || stream !== currentStream) return;
+      transport = "disconnected";
+      streamMessage = "Connection lost. Retrying automatically; displayed prices retain their original timestamps.";
       connection("disconnected", "DISCONNECTED");
       $("notice").textContent =
         "Live connection lost. Reconnecting… Displayed prices may be stale.";
@@ -333,10 +403,12 @@
           ...prices.get(item),
           name: result.data.name,
           currency: result.data.currency,
+          usMarket: isUsExchange(result.data),
         });
       } else continue;
       const resultQuote = await get(`/api/data/stock/${item}/quote`);
       quote(item, resultQuote.data);
+      if (resultQuote.state !== "ok") prices.set(item, { ...prices.get(item), symbol: item, quoteState: resultQuote.state });
     }
     renderWatch();
     connect();
@@ -522,6 +594,7 @@
       ...prices.get(symbol),
       name: profile.name,
       currency: profile.currency,
+      usMarket: isUsExchange(profile),
     });
     $("company").textContent = profile.name || symbol;
     $("symbol").textContent = symbol;
@@ -557,6 +630,7 @@
     connect();
     const q = await get(dataPath("quote"));
     quote(symbol, q.data);
+    if (q.state !== "ok") prices.set(symbol, { ...prices.get(symbol), symbol, quoteState: q.state });
     updatePrices();
     if (!prices.get(symbol)?.price)
       $("data-age").textContent =
@@ -716,8 +790,9 @@
     $("more-stocks").textContent = expanded ? "Fewer stocks" : "More stocks";
   };
   async function loadSpotlight() {
-    if (spotlightLoading) return;
+    if (spotlightLoading || !pageActive) return;
     spotlightLoading = true;
+    initializationError = false;
     lastSpotlightAttempt = Date.now();
     $("ticker-stocks").replaceChildren();
     $("spotlight").replaceChildren();
@@ -739,15 +814,18 @@
       const result = await get("/api/data/stock/" + ticker + "/profile");
       if (result.state !== "ok" || result.data?.ticker !== ticker) {
         name.textContent = result.message || "Company information unavailable.";
+        initializationError = true;
+        if (!stream) { connection("error", "ERROR"); $("notice").textContent = name.textContent; }
         block.querySelector(".age").textContent = "Unavailable";
         tickerLink.querySelector(".age").textContent = "Unavailable";
         continue;
       }
       name.textContent = result.data.name || ticker;
-      prices.set(ticker, { ...prices.get(ticker), name: result.data.name, currency: result.data.currency });
+      prices.set(ticker, { ...prices.get(ticker), name: result.data.name, currency: result.data.currency, usMarket: isUsExchange(result.data) });
       spotlightSymbols.add(ticker);
       const resultQuote = await get("/api/data/stock/" + ticker + "/quote");
       quote(ticker, resultQuote.data);
+      if (resultQuote.state !== "ok") prices.set(ticker, { ...prices.get(ticker), symbol: ticker, quoteState: resultQuote.state });
       updatePrices();
     }
     connect();
@@ -759,17 +837,23 @@
   function refreshMarketStatus() {
     return get("/api/data/status").then((result) => {
       const status = result.data;
-      marketOpen = result.state === "ok" && typeof status?.isOpen === "boolean" ? status.isOpen : null;
+      marketCheckedAt = Date.now();
+      const validStatus = result.state === "ok" && typeof status?.isOpen === "boolean" && number(status.t) && Math.abs(now() - status.t * 1000) < 180000;
+      marketOpen = validStatus ? status.isOpen : null;
       $("market-status").textContent =
-        result.state === "ok" && typeof status?.isOpen === "boolean"
+        validStatus
           ? `US MARKET ${status.isOpen ? "OPEN" : "CLOSED"}${status.session ? " · " + status.session : ""}`
           : "US MARKET STATUS UNAVAILABLE";
+      updatePrices();
     });
   }
   refreshMarketStatus();
   setInterval(refreshMarketStatus, 60000);
   setInterval(() => {
+    if (!pageActive) return;
     if (stream && Date.now() - lastEvent > 15000) {
+      transport = "disconnected";
+      streamMessage = "Connection lost. Retrying automatically; displayed prices retain their original timestamps.";
       connection("disconnected", "DISCONNECTED");
       $("notice").textContent =
         "No recent connection heartbeat. Displayed prices may be stale.";
@@ -781,13 +865,21 @@
     if (spotlightSymbols.size < 6 && Date.now() - lastSpotlightAttempt >= 60000) loadSpotlight();
     updatePrices();
   }, 5000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && pageActive) {
+      if (Date.now() - lastEvent > 15000) connect();
+      refreshMarketStatus();
+    }
+  });
   window.addEventListener("online", () => {
     if (spotlightSymbols.size < 6) loadSpotlight();
     else connect();
     refreshMarketStatus();
   });
   window.addEventListener("pagehide", () => {
+    pageActive = false;
     stream?.close();
+    stream = undefined;
     searchAbort?.abort();
   });
   window.addEventListener("pageshow", (event) => {

@@ -680,7 +680,7 @@ input::placeholder { color: var(--muted); opacity: 1; }
 .ticker-stocks:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
 #connection { display: inline-flex; align-items: center; gap: 8px; }
 #connection::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: 0 0 auto; }
-#connection[data-state="connected"]::before { background: var(--green); animation: connection-pulse 1.8s ease-in-out infinite; }
+#connection[data-state="live"]::before { background: var(--green); animation: connection-pulse 1.8s ease-in-out infinite; }
 @keyframes connection-pulse { 50% { opacity: .35; } }
 #theme:hover:not(:disabled) { background: var(--ink); color: var(--paper); border-color: var(--green); box-shadow: 0 0 0 2px var(--accent); }
 .explore-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
@@ -689,4 +689,4 @@ input::placeholder { color: var(--muted); opacity: 1; }
 #more-stocks { margin-top: 18px; }
 @media (max-width: 1100px) { .explore-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .explore-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (prefers-reduced-motion: reduce) { #connection[data-state="connected"]::before { animation: none; } }
+@media (prefers-reduced-motion: reduce) { #connection[data-state="live"]::before { animation: none; } }

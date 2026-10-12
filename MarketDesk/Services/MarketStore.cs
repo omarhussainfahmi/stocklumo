@@ -16,6 +16,8 @@ public sealed class MarketStore
         new Stock("V", "Visa", "Payments")
     }.ToDictionary(s => s.Symbol, StringComparer.Ordinal);
     private string status = "setup";
+    private DateTimeOffset? lastProviderMessageAt;
+    private int subscriptionCount;
     private readonly Dictionary<string, int> viewers = new(StringComparer.Ordinal);
     public string[] ActiveSymbols { get { lock (gate) return viewers.Keys.ToArray(); } }
     public void Ensure(string symbol, string name, string sector)
@@ -56,16 +58,18 @@ public sealed class MarketStore
     }
     private string message = "Connect your Finnhub API key to receive market data.";
     public string[] Symbols { get { lock (gate) return stocks.Keys.ToArray(); } }
-    public MarketSnapshot Snapshot() { lock (gate) return new(status, message, DateTimeOffset.UtcNow, stocks.Values.ToArray()); }
+    public MarketSnapshot Snapshot() { lock (gate) return new(status, message, DateTimeOffset.UtcNow, stocks.Values.ToArray(), lastProviderMessageAt, subscriptionCount); }
+    public void ProviderMessage() { lock (gate) lastProviderMessageAt = DateTimeOffset.UtcNow; }
+    public void SubscriptionCount(int count) { lock (gate) subscriptionCount = count; }
     public void SetStatus(string value, string detail) { lock (gate) { status = value; message = detail; } }
     public void Quote(string symbol, decimal price, decimal previous, decimal open, decimal high, decimal low, long timestamp)
     {
-        if (price <= 0 || timestamp <= 0 || timestamp > 253402300799) return;
+        if (price <= 0 || timestamp <= 0 || timestamp > DateTimeOffset.UtcNow.AddMinutes(1).ToUnixTimeSeconds()) return;
         lock (gate)
         {
             if (!stocks.TryGetValue(symbol, out var old)) return;
             var time = DateTimeOffset.FromUnixTimeSeconds(timestamp);
-            var newer = old.UpdatedAt is null || time >= old.UpdatedAt;
+            var newer = old.UpdatedAt is null || time > old.UpdatedAt || (time == old.UpdatedAt && old.Source != "Trade");
             stocks[symbol] = old with
             {
                 Price = newer ? price : old.Price,
@@ -74,19 +78,24 @@ public sealed class MarketStore
                 High = high > 0 ? high : null,
                 Low = low > 0 ? low : null,
                 UpdatedAt = newer ? time : old.UpdatedAt,
-                Source = newer ? "Quote" : old.Source
+                Source = newer ? "Quote" : old.Source,
+                QuoteState = "ok"
             };
         }
     }
+    public void QuoteState(string symbol, string state)
+    {
+        lock (gate) if (stocks.TryGetValue(symbol, out var stock)) stocks[symbol] = stock with { QuoteState = state };
+    }
     public void Trade(string symbol, decimal price, long timestamp)
     {
-        if (price <= 0 || timestamp <= 0 || timestamp > 253402300799999) return;
+        if (price <= 0 || timestamp <= 0 || timestamp > DateTimeOffset.UtcNow.AddMinutes(1).ToUnixTimeMilliseconds()) return;
         lock (gate)
         {
             if (!stocks.TryGetValue(symbol, out var old)) return;
             var time = DateTimeOffset.FromUnixTimeMilliseconds(timestamp);
             if (old.UpdatedAt > time) return;
-            stocks[symbol] = old with { Price = price, UpdatedAt = time, Source = "Trade" };
+            stocks[symbol] = old with { Price = price, UpdatedAt = time, Source = "Trade", TradeReceivedAt = DateTimeOffset.UtcNow };
         }
     }
 }

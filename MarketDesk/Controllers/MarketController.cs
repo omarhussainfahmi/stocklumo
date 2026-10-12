@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace MarketDesk.Controllers;
 
+[ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public sealed class MarketController(MarketStore store) : Controller
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);

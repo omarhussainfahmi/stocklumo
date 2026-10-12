@@ -11,6 +11,100 @@ namespace MarketDesk.Tests;
 public sealed class MarketTests
 {
     [Fact]
+    public async Task SubscriptionSessionsDeduplicateUnsubscribeAndResubscribeAfterReconnect()
+    {
+        var store = new MarketStore();
+        var first = store.Subscribe(["AAPL"]);
+        using var duplicate = store.Subscribe(["AAPL"]);
+        var second = store.Subscribe(["MSFT"]);
+        var feed = new FinnhubFeed(store, null!, new ConfigurationBuilder().Build(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<FinnhubFeed>.Instance);
+        using var session = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var socket = new RecordingSocket();
+        var work = feed.SynchronizeAsync(socket, session);
+        await socket.Sent.Reader.ReadAsync(session.Token);
+        await socket.Sent.Reader.ReadAsync(session.Token);
+        Assert.Equal(2, store.Snapshot().SubscriptionCount);
+        first!.Dispose();
+        second!.Dispose();
+        var removed = await socket.Sent.Reader.ReadAsync(session.Token);
+        Assert.Contains("unsubscribe", removed);
+        Assert.Contains("MSFT", removed);
+        Assert.False(socket.Sent.Reader.TryRead(out _));
+        await session.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => work);
+        using var nextSession = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var nextSocket = new RecordingSocket();
+        var nextWork = feed.SynchronizeAsync(nextSocket, nextSession);
+        var resubscribed = await nextSocket.Sent.Reader.ReadAsync(nextSession.Token);
+        Assert.Contains("subscribe", resubscribed);
+        Assert.Contains("AAPL", resubscribed);
+        await nextSession.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => nextWork);
+    }
+
+    private sealed class RecordingSocket : System.Net.WebSockets.WebSocket
+    {
+        public System.Threading.Channels.Channel<string> Sent { get; } = System.Threading.Channels.Channel.CreateUnbounded<string>();
+        public override System.Net.WebSockets.WebSocketCloseStatus? CloseStatus => null;
+        public override string? CloseStatusDescription => null;
+        public override string? SubProtocol => null;
+        public override System.Net.WebSockets.WebSocketState State => System.Net.WebSockets.WebSocketState.Open;
+        public override void Abort() { }
+        public override void Dispose() { }
+        public override Task CloseAsync(System.Net.WebSockets.WebSocketCloseStatus status, string? description, CancellationToken token) => Task.CompletedTask;
+        public override Task CloseOutputAsync(System.Net.WebSockets.WebSocketCloseStatus status, string? description, CancellationToken token) => Task.CompletedTask;
+        public override Task<System.Net.WebSockets.WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken token) => throw new NotSupportedException();
+        public override Task SendAsync(ArraySegment<byte> buffer, System.Net.WebSockets.WebSocketMessageType type, bool end, CancellationToken token)
+        {
+            Sent.Writer.TryWrite(System.Text.Encoding.UTF8.GetString(buffer));
+            return Task.CompletedTask;
+        }
+    }
+
+    [Fact]
+    public void InvalidTradeEntriesDoNotDiscardValidEntriesAndFutureDataIsRejected()
+    {
+        var store = new MarketStore();
+        FinnhubFeed.ApplyMessage("""
+            {"type":"trade","data":[null,{"s":"AAPL","p":"bad","t":1},{"s":"AAPL","p":12,"t":1700000000123},{"s":"AAPL","p":99,"t":253402300799000}]}
+            """u8.ToArray(), store);
+        var stock = store.Snapshot().Stocks[0];
+        Assert.Equal(12m, stock.Price);
+        Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(1700000000123), stock.UpdatedAt);
+        Assert.NotNull(stock.TradeReceivedAt);
+        Assert.NotNull(store.Snapshot().LastProviderMessageAt);
+        store.Quote("AAPL", 99, 10, 10, 10, 10, 253402300799);
+        Assert.Equal(12m, store.Snapshot().Stocks[0].Price);
+    }
+
+    [Fact]
+    public void QuoteErrorsRetainActualTimestampAndRecoverWithoutReplacingEqualTimeTrade()
+    {
+        var store = new MarketStore();
+        store.Trade("AAPL", 12, 1700000000000);
+        store.QuoteState("AAPL", "limited");
+        Assert.Equal("limited", store.Snapshot().Stocks[0].QuoteState);
+        store.Quote("AAPL", 11, 10, 10, 12, 10, 1700000000);
+        Assert.Equal("ok", store.Snapshot().Stocks[0].QuoteState);
+        Assert.Equal(12m, store.Snapshot().Stocks[0].Price);
+        Assert.Equal("Trade", store.Snapshot().Stocks[0].Source);
+        Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(1700000000), store.Snapshot().Stocks[0].UpdatedAt);
+    }
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("[]")]
+    [InlineData("{\"type\":123}")]
+    [InlineData("{\"type\":\"trade\",\"data\":{}}")]
+    public void UnexpectedMessageShapesNeverInventPrices(string message)
+    {
+        var store = new MarketStore();
+        FinnhubFeed.ApplyMessage(System.Text.Encoding.UTF8.GetBytes(message), store);
+        Assert.All(store.Snapshot().Stocks, stock => Assert.Null(stock.Price));
+    }
+
+    [Fact]
     public void FinnhubTradeBatchesUpdateOnlySupportedSymbols()
     {
         var store = new MarketStore();

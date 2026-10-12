@@ -173,3 +173,60 @@ The free address remains https://stocklumo.onrender.com. A custom `www.stocklumo
 
 Deployment verification completed on 11 October 2026: commit 4d49e80 is Live on Render Free and GitHub workflow 38145691526 passed. All 60 backend and 25 frontend tests pass. Formatting, npm audit and .NET dependency scans passed. Public health, five new routes, research and earnings APIs, security headers and credential-isolation checks passed. The published screener loaded all 12 companies, and SSE delivered advancing heartbeats with genuine Friday quote timestamps during the closed Sunday market.
 
+
+
+## Live-data diagnosis (12 October 2026)
+
+At 11:27 UTC (07:27 New York), the production quote endpoint returned AAPL
+336.64 with provider timestamp 2026-10-09 20:00:00 UTC. Finnhub market status
+reported `isOpen=false`, `session=pre-market`. An eight-second production SSE
+sample delivered eight changing server heartbeats with the same quote timestamp.
+A direct browser load reproduced this; its console had no errors. Render logs
+showed successful startup and no feed errors in the inspected period. No local
+MarketDesk process was running during the initial investigation.
+
+Confirmed defects: upstream handshake success drove the green connected indicator
+without a received trade; quote-refresh failures were discarded; malformed trade
+entries could abort a complete batch; replaced EventSource callbacks could still
+write to current state. The observed old quote is provider data from Friday's close,
+not a timestamp conversion error. These findings do not prove an open-market outage.
+Google returned no Stocklumo result for the exact hostname during this check, so a
+real indexed search-result click could not be tested. No service worker or
+referrer-dependent initialization exists in the source.
+
+Connection health remains `status` in `/api/market` and SSE. `lastProviderMessageAt`
+records an actual upstream JSON message (including pings); `subscriptionCount`
+counts successfully sent subscriptions, not provider acknowledgments. Per-stock
+`tradeReceivedAt` records receipt of an accepted trade; `updatedAt` always remains
+the provider's price timestamp. `quoteState` reports REST failures without erasing
+the last good price. No credentials or raw provider error bodies are included.
+
+The browser separates CONNECTING, LIVE, MARKET CLOSED, STALE, DISCONNECTED and
+ERROR. LIVE requires an accepted US-exchange trade with both provider and receipt
+age within 120 seconds, an active connection, and a current open-market status.
+This is a conservative application observation window, not a Finnhub latency or
+full-exchange coverage guarantee. REST observations use a 180-second stale window,
+allowing for the shared 60-second cache and polling cycle; they do not alone earn
+LIVE. Closed regular sessions are explained separately. Thinly traded stocks can
+be stale without a transport failure. Unknown exchange calendars/entitlements are
+not inferred from a company's headquarters. Delayed coverage is not assigned an
+invented delay duration. Market-status checks expire after two minutes and reject
+provider status timestamps older than three minutes. Absolute price date/time and
+local timezone are displayed; future values beyond one minute are rejected.
+
+Keep one application instance per Finnhub key: Finnhub documents a single upstream
+WebSocket connection per key. Do not run a credentialed local instance alongside
+Render. Reconnects retain bounded exponential backoff and rebuild the subscription
+set; browser recovery ignores callbacks from old connections and resumes after
+visibility changes. HTML and data requests use no-store; static bundles remain
+content-versioned. Render Free cold starts remain possible and are not disguised
+as fresh data.
+
+Verification commands: `dotnet test -c Release`, `npm test`,
+`dotnet format --verify-no-changes --no-restore`, and `git diff --check`.
+The repair regression run passed 67 backend and 29 frontend tests, including existing
+research features. Real open-session trade advancement still requires observation
+while Finnhub supplies trades; synthetic fixtures are used only in automated tests.
+
+References: [Finnhub streaming contract](https://finnhub.io/docs/api/websocket-trades),
+[NYSE hours and holiday calendar](https://www.nyse.com/trade/hours-calendars).

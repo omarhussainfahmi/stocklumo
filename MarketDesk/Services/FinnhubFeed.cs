@@ -25,13 +25,19 @@ public sealed class FinnhubFeed(MarketStore store, FinnhubApi api, IConfiguratio
             foreach (var symbol in store.ActiveSymbols)
             {
                 var result = await api.GetAsync("quote?symbol=" + Uri.EscapeDataString(symbol), TimeSpan.FromSeconds(60), token);
-                if (result.Data is not { } data) continue;
+                if (result.Data is not { } data)
+                {
+                    store.QuoteState(symbol, result.State);
+                    continue;
+                }
                 try
                 {
                     var quote = data.Deserialize<QuoteResponse>();
-                    if (quote is not null) store.Quote(symbol, quote.c, quote.pc, quote.o, quote.h, quote.l, quote.t);
+                    if (quote is not null && quote.c > 0 && quote.t > 0 && quote.t <= DateTimeOffset.UtcNow.AddMinutes(1).ToUnixTimeSeconds())
+                        store.Quote(symbol, quote.c, quote.pc, quote.o, quote.h, quote.l, quote.t);
+                    else store.QuoteState(symbol, "unavailable");
                 }
-                catch (JsonException) { logger.LogWarning("Invalid quote payload."); }
+                catch (JsonException) { store.QuoteState(symbol, "error"); logger.LogWarning("Invalid quote payload."); }
             }
             await Task.Delay(TimeSpan.FromSeconds(5), token);
         }
@@ -47,6 +53,7 @@ public sealed class FinnhubFeed(MarketStore store, FinnhubApi api, IConfiguratio
                 await Task.Delay(TimeSpan.FromSeconds(1), token);
                 continue;
             }
+            var failureState = "disconnected";
             try
             {
                 store.SetStatus("connecting", "Connecting to Finnhub. Quotes may be available while the stream connects.");
@@ -62,7 +69,7 @@ public sealed class FinnhubFeed(MarketStore store, FinnhubApi api, IConfiguratio
                 var subscriptions = SynchronizeAsync(socket, session);
                 try
                 {
-                    store.SetStatus("connected", "Stream connected. Prices update when trades arrive; timestamps show data age.");
+                    store.SetStatus("connected", "Upstream socket connected. Waiting for qualifying market data; connection health does not establish quote freshness.");
                     var connectedAt = DateTimeOffset.UtcNow;
                     var buffer = new byte[8192];
                     while (socket.State == WebSocketState.Open)
@@ -91,14 +98,16 @@ public sealed class FinnhubFeed(MarketStore store, FinnhubApi api, IConfiguratio
             catch (Exception ex) when (ex is WebSocketException or HttpRequestException or JsonException or InvalidDataException or InvalidOperationException or KeyNotFoundException or FormatException or OverflowException or OperationCanceledException)
             {
                 // Provider exceptions can contain the credential-bearing URI. Never log their messages.
+                if (ex is InvalidDataException or JsonException) failureState = "error";
                 logger.LogWarning("Market stream interrupted ({FailureType}).", ex.GetType().Name);
             }
-            store.SetStatus("reconnecting", "Stream unavailable. Retrying automatically; check the API key and Finnhub access if this persists.");
+            store.SubscriptionCount(0);
+            store.SetStatus(failureState, "Stream unavailable. Retrying automatically; check the API key and Finnhub access if this persists.");
             await Task.Delay(TimeSpan.FromSeconds(delay) + TimeSpan.FromMilliseconds(Random.Shared.Next(500)), token);
             delay = Math.Min(delay * 2, 60);
         }
     }
-    private async Task SynchronizeAsync(ClientWebSocket socket, CancellationTokenSource session)
+    internal async Task SynchronizeAsync(WebSocket socket, CancellationTokenSource session)
     {
         var subscribed = new HashSet<string>(StringComparer.Ordinal);
         try
@@ -116,6 +125,7 @@ public sealed class FinnhubFeed(MarketStore store, FinnhubApi api, IConfiguratio
                     await socket.SendAsync(JsonSerializer.SerializeToUtf8Bytes(new { type = "subscribe", symbol }), WebSocketMessageType.Text, true, session.Token);
                     subscribed.Add(symbol);
                 }
+                store.SubscriptionCount(subscribed.Count);
                 if (desired.Count == 0) return;
                 await Task.Delay(TimeSpan.FromSeconds(1), session.Token);
             }
@@ -126,14 +136,21 @@ public sealed class FinnhubFeed(MarketStore store, FinnhubApi api, IConfiguratio
     {
         using var doc = JsonDocument.Parse(message);
         var root = doc.RootElement;
-        if (!root.TryGetProperty("type", out var type)) return;
+        if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.String) return;
+        store.ProviderMessage();
         if (type.GetString() == "error") throw new InvalidDataException();
-        if (type.GetString() != "trade" || !root.TryGetProperty("data", out var data)) return;
+        if (type.GetString() != "trade" || !root.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array) return;
         foreach (var trade in data.EnumerateArray())
         {
-            store.Trade(trade.GetProperty("s").GetString() ?? "", trade.GetProperty("p").GetDecimal(), trade.GetProperty("t").GetInt64());
+            // A malformed entry must not discard later valid trades in the same batch.
+            if (trade.ValueKind != JsonValueKind.Object ||
+                !trade.TryGetProperty("s", out var symbol) || symbol.ValueKind != JsonValueKind.String ||
+                !trade.TryGetProperty("p", out var price) || price.ValueKind != JsonValueKind.Number || !price.TryGetDecimal(out var value) ||
+                !trade.TryGetProperty("t", out var time) || time.ValueKind != JsonValueKind.Number || !time.TryGetInt64(out var timestamp)) continue;
+            store.Trade(symbol.GetString() ?? "", value, timestamp);
         }
     }
+
     private sealed record QuoteResponse(decimal c, decimal pc, decimal o, decimal h, decimal l, long t);
 }
 

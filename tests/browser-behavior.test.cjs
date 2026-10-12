@@ -7,7 +7,7 @@ const script = readFileSync("MarketDesk/wwwroot/js/market.js", "utf8");
 const settle = () => new Promise((resolve) => setTimeout(resolve, 30));
 
 // Synthetic values are test fixtures only. They never ship as application data.
-function page({ missing = false, quoteWait, storedWatch = [], dashboard = false } = {}) {
+function page({ missing = false, quoteWait, storedWatch = [], dashboard = false, marketOpen = false } = {}) {
   const dom = new JSDOM(html, {
     url: dashboard ? "http://localhost/" : "http://localhost/stock/AAPL",
     runScripts: "outside-only",
@@ -41,7 +41,7 @@ function page({ missing = false, quoteWait, storedWatch = [], dashboard = false 
           ticker: dashboard ? url.split("/")[4] : "AAPL",
           name: "Test Company",
           country: "US",
-          exchange: "Test Exchange",
+          exchange: "NASDAQ/NMS (GLOBAL MARKET)",
           currency: "USD",
           weburl: "javascript:alert(1)",
         },
@@ -70,7 +70,7 @@ function page({ missing = false, quoteWait, storedWatch = [], dashboard = false 
           { headline: "Bad URL", url: "javascript:alert(1)" },
         ],
       };
-    else body = { state: "ok", data: { isOpen: false, session: "closed" } };
+    else body = { state: "ok", data: { isOpen: marketOpen, session: marketOpen ? "regular" : "closed", t: Math.floor(w.Date.now() / 1000) } };
     return { ok: true, json: async () => body };
   };
   w.eval(script);
@@ -89,7 +89,7 @@ test("spotlight subscribes to real symbols and renders incoming prices", async (
   assert.equal(card.querySelector('.delta').textContent, '+1.50%');
   assert.match(card.querySelector('.age').textContent, /s ago/);
   assert.equal(dom.window.document.querySelector('#ticker-stocks [data-price-symbol="NVDA"] .last').textContent, '123.45 USD');
-  assert.equal(dom.window.document.getElementById('connection').dataset.state, 'connected');
+  assert.equal(dom.window.document.getElementById('connection').dataset.state, 'closed');
   stream.onerror();
   assert.equal(dom.window.document.getElementById('connection').dataset.state, 'disconnected');
   dom.window.close();
@@ -278,4 +278,53 @@ test("failed ticker initialization retries and starts streaming when profiles re
   const now=dom.window.Date.now();dom.window.Date.now=()=>now+61000;dom.timers.at(-1)();await settle();
   assert.match(decodeURIComponent(dom.streams.at(-1).url),/META/);
   assert.match(dom.window.document.querySelector('#ticker-stocks .last').textContent,/100/);dom.window.close();
+});
+
+
+test("a handshake and heartbeats cannot claim live; only a fresh received US trade can", async () => {
+  const dom = page({ dashboard: true, marketOpen: true }); await settle();
+  const w = dom.window, stream = dom.streams.at(-1), label = w.document.getElementById("connection");
+  const send = stocks => stream.onmessage({ data: JSON.stringify({ status: "connected", stocks }) });
+  send([]); assert.equal(label.textContent, "STALE");
+  const updatedAt = new Date(w.Date.now()).toISOString();
+  send([{ symbol: "AAPL", price: 101, updatedAt, source: "Quote" }]);
+  assert.equal(label.textContent, "STALE");
+  send([{ symbol: "AAPL", price: 102, updatedAt, source: "Trade", tradeReceivedAt: updatedAt }]);
+  assert.equal(label.textContent, "LIVE");
+  assert.match(w.document.querySelector('#ticker-stocks .age').textContent, /live/);
+  const start = w.Date.now(); w.Date.now = () => start + 181000;
+  await dom.timers[0](); send([]); assert.equal(label.textContent, "STALE");
+  dom.window.close();
+});
+
+test("discarded connection callbacks and hidden-page timers cannot revive an old stream", async () => {
+  const dom = page({ dashboard: true }); await settle();
+  const old = dom.streams.at(-1), w = dom.window;
+  w.dispatchEvent(new w.Event("online")); await settle();
+  const current = dom.streams.at(-1); assert.notEqual(old, current);
+  old.onmessage({data:JSON.stringify({status:"connected",stocks:[{symbol:"AAPL",price:999,updatedAt:new Date().toISOString()}]})});
+  assert.doesNotMatch(w.document.querySelector('#ticker-stocks .last').textContent, /999/);
+  old.onerror(); assert.notEqual(w.document.getElementById("connection").textContent,"DISCONNECTED");
+  w.dispatchEvent(new w.Event("pagehide"));
+  const count = dom.streams.length; dom.timers.at(-1)(); w.dispatchEvent(new w.Event("online")); await settle();
+  assert.equal(dom.streams.length,count); assert.equal(current.closed,true); dom.window.close();
+});
+
+test("invalid, future and unsolicited prices are ignored while quote failures stay visible", async () => {
+  const dom = page({ dashboard:true, marketOpen:true }); await settle();
+  const stream = dom.streams.at(-1), w=dom.window;
+  stream.onmessage({data:"null"}); stream.onmessage({data:"not json"});
+  stream.onmessage({data:JSON.stringify({status:"connected",stocks:[null,{symbol:"AAPL",price:999,updatedAt:"2999-01-01T00:00:00Z"},{symbol:"UNKNOWN",price:20,updatedAt:new Date().toISOString()},{symbol:"MSFT",quoteState:"limited",price:null}]})});
+  assert.match(w.document.querySelector('#ticker-stocks .last').textContent,/100/);
+  assert.equal(w.document.getElementById("connection").textContent,"ERROR");
+  assert.match(w.document.getElementById("notice").textContent,/MSFT/); dom.window.close();
+});
+
+test("market status expires instead of assuming an old closure is still valid", async () => {
+  const dom=page({dashboard:true}); await settle(); const w=dom.window;
+  const send=()=>dom.streams.at(-1).onmessage({data:JSON.stringify({status:"connected",stocks:[]})});
+  send(); assert.equal(w.document.getElementById("connection").textContent,"MARKET CLOSED");
+  const initial=w.Date.now(); w.Date.now=()=>initial+121000; send();
+  assert.equal(w.document.getElementById("connection").textContent,"STALE");
+  assert.match(w.document.getElementById("notice").textContent,/could not be verified/); dom.window.close();
 });
