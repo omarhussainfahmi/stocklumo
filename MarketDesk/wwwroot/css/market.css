@@ -12,7 +12,8 @@
   --shadow: #081b3012;
 }
 .research-nav { display: flex; flex-wrap: wrap; gap: 12px 24px; padding: 14px 0; border-bottom: 1px solid var(--line); }
-.research-nav a { font-size: 14px; }
+.research-nav a { color: var(--ink); font-size: 16px; text-decoration: none; }
+.research-nav a[aria-current="page"] { color: var(--green); font-weight: 700; }
 .research-controls { display: flex; align-items: end; flex-wrap: wrap; gap: 16px; margin: 24px 0; }
 .research-controls label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; flex: 1 1 180px; }
 .research-controls input, .research-controls select { width: 100%; min-height: 42px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); padding: 8px 10px; font: inherit; }
