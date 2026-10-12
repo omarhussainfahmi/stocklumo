@@ -83,9 +83,14 @@ public sealed class MarketStore
             };
         }
     }
-    public void QuoteState(string symbol, string state)
+    public bool QuoteState(string symbol, string state)
     {
-        lock (gate) if (stocks.TryGetValue(symbol, out var stock)) stocks[symbol] = stock with { QuoteState = state };
+        lock (gate)
+        {
+            if (!stocks.TryGetValue(symbol, out var stock) || stock.QuoteState == state) return false;
+            stocks[symbol] = stock with { QuoteState = state };
+            return true;
+        }
     }
     public void Trade(string symbol, decimal price, long timestamp)
     {

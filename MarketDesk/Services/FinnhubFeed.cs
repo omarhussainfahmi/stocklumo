@@ -27,7 +27,8 @@ public sealed class FinnhubFeed(MarketStore store, FinnhubApi api, IConfiguratio
                 var result = await api.GetAsync("quote?symbol=" + Uri.EscapeDataString(symbol), TimeSpan.FromSeconds(60), token);
                 if (result.Data is not { } data)
                 {
-                    store.QuoteState(symbol, result.State);
+                    if (store.QuoteState(symbol, result.State))
+                        logger.LogWarning("Quote refresh failed for {Symbol} ({State}).", symbol, result.State);
                     continue;
                 }
                 try
