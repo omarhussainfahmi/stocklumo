@@ -268,3 +268,21 @@ zero errors; `dotnet test -c Release --no-build` passed 68 tests; `npm test` pas
 Production checks returned 200 for the dashboard, markets, watchlist, news,
 stock details, screener, comparison, portfolio and earnings pages, with no Technical
 Analysis navigation link. Both `/technical` and `/technical/` returned 404.
+
+## Frontend redesign - 13 October 2026
+
+The existing MVC/Razor architecture, routes, Finnhub integration, persistence keys and API contracts are unchanged. No runtime dependencies or external fonts were added. Technical Analysis remains disabled.
+
+- Dashboard: original CSS grid and restrained mint background, prominent existing stock search, six-stock percentage movement panel, browser-local watchlist/recent counts, numbered sections and links to the four research tools. The movement panel uses existing ticker quotes, a shared symmetric scale, and signed values. It makes no extra requests and does not redraw unchanged values. Availability counts are explicitly not freshness claims.
+- Markets: the same real quote movement panel and a compact discovery layout. Neither this panel nor the spotlight represents an index, ranking or the entire market.
+- Stock details: responsive company/quote summary, larger tabular prices, improved chart surface/range controls and structured company statistics. Existing keyboard/pointer chart inspection is preserved.
+- Watchlist and news: consistent tables, narrow-screen watchlist rows and editorial news columns; existing saved data and publisher links remain intact.
+- Screener and earnings: shared filter panels, readable scrollable results, consistent status/empty states. Filters, validation and provider limitations are preserved.
+- Comparison: signed financial changes, shared chart scales with axis labels, differentiated line patterns, legends and the existing accessible historical-values table.
+- Virtual portfolio: separate currency totals, signed unrealized profit/loss and aligned allocation meters. All holdings remain hypothetical and local to the browser.
+
+Visual research used the publicly accessible WarMonitor landing page and World Monitor landing/finance dashboard. Their hierarchy, sectional organization and compact panels informed the design; no source code, artwork, maps, wording or assets were copied. The finance dashboard showed some loading panels during inspection; this is not a claim that all its data or interactions were accessible. References: https://warmonitor.app/ and https://www.worldmonitor.app/ .
+
+The shared stylesheet replaces the previous rules rather than adding a second styling layer. System sans-serif text and system monospace financial/metadata typography need no font downloads. Light/dark palettes include readable series colors; motion reduction, focus indicators, semantic labels and honest unavailable-data states remain supported.
+
+Verification: Release build passed with zero warnings/errors; 68 backend tests and 31 frontend tests passed. New coverage checks the movement panel's shared scale, missing-data behavior and absence of additional requests, plus comparison chart labeling, unavailable history and invalid selection. Portfolio assertions verify the new numeric summaries. Local browser checks covered all nine working routes at mobile width, tablet filters, desktop layout and both themes. Local preview intentionally used no Finnhub key to avoid opening a second upstream provider connection; production verification is separate. Historical charts remain dependent on the provider's candle entitlement.

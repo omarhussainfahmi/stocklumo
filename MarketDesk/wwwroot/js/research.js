@@ -124,6 +124,11 @@
     wrap.append(table);
     results.append(wrap);
   }
+  function change(value) {
+    const label = node("span", math.finite(value) ? `${value > 0 ? "+" : ""}${fmt(value)}` : "Unavailable");
+    if (math.finite(value)) label.className = value < 0 ? "down" : "up";
+    return label;
+  }
   function stockLink(symbol) {
     const link = node("a", symbol);
     link.href = "/stock/" + encodeURIComponent(symbol);
@@ -210,7 +215,7 @@
           found.map((r) => [
             stockLink(r.symbol),
             fmt(r.price),
-            fmt(r.changePercent),
+            change(r.changePercent),
             r.industry || "Unavailable",
             fmt(r.marketCapMillions),
             fmt(r.averageVolumeMillions),
@@ -327,6 +332,15 @@
     svg.setAttribute("role", "img");
     svg.setAttribute("aria-label", label);
     svg.classList.add("research-chart");
+    // Keep scale labels inside the SVG so they stay aligned at every viewport size.
+    [max, (max + min) / 2, min].forEach((value, index) => {
+      const text = document.createElementNS(svg.namespaceURI, "text");
+      text.setAttribute("x", "12");
+      text.setAttribute("y", String(30 + index * 100));
+      text.setAttribute("class", "chart-axis-label");
+      text.textContent = fmt(value);
+      svg.append(text);
+    });
     usable.forEach((s, i) => {
       const path = document.createElementNS(svg.namespaceURI, "path");
       path.setAttribute(
@@ -334,11 +348,12 @@
         s.points
           .map(
             (p, j) =>
-              `${j ? "L" : "M"}${20 + ((p.time - start) / (end - start || 1)) * 860},${230 - ((p.value - min) / (max - min || 1)) * 200}`,
+              `${j ? "L" : "M"}${100 + ((p.time - start) / (end - start || 1)) * 780},${230 - ((p.value - min) / (max - min || 1)) * 200}`,
           )
           .join(" "),
       );
       path.setAttribute("class", `series-${i % 5}`);
+      path.setAttribute("stroke-dasharray", ["none", "8 4", "3 3", "12 4 3 4", "2 5"][i % 5]);
       svg.append(path);
     });
     results.append(
@@ -350,6 +365,7 @@
       svg,
     );
     const legend = node("p");
+    legend.className = "chart-legend";
     usable.forEach((s, i) => {
       const entry = node("span", `${s.name}  `);
       entry.className = `series-label-${i % 5}`;
@@ -418,7 +434,7 @@
         rows.map((r, i) => [
           stockLink(items[i]),
           `${fmt(r.price)} ${r.currency || ""}`,
-          fmt(r.changePercent),
+          change(r.changePercent),
           fmt(r.marketCapMillions),
           fmt(r.peTtm),
           fmt(r.dividendYieldTtm),
@@ -581,7 +597,7 @@
             h.date,
             `${fmt(h.cost)} ${h.currency}`,
             fmt(h.value),
-            fmt(h.profit),
+            change(h.profit),
             h.timestamp
               ? new Date(h.timestamp * 1000).toLocaleString()
               : "Unavailable or older than purchase",
@@ -590,13 +606,15 @@
         }),
       );
       valuation.groups.forEach((g) => {
-        results.append(
-          node("h2", `${g.currency} portfolio`),
-          node(
-            "p",
-            `Cost basis: ${fmt(g.cost)} | Value: ${fmt(g.value)} | Unrealized P/L: ${fmt(g.profit)}`,
-          ),
-        );
+        const metrics = node("dl");
+        metrics.className = "portfolio-metrics";
+        [["Cost basis", g.cost], ["Value", g.value], ["Unrealized P/L", g.profit]].forEach(([label, value]) => {
+          const group = node("div"), amount = node("dd");
+          amount.append(label === "Unrealized P/L" ? change(value) : node("span", fmt(value)));
+          group.append(node("dt", label), amount);
+          metrics.append(group);
+        });
+        results.append(node("h2", `${g.currency} portfolio`), metrics);
         if (g.value === null) {
           results.append(
             node(
@@ -620,8 +638,9 @@
           meter.max = 100;
           meter.value = share;
           meter.setAttribute("aria-label", `${symbol} allocation`);
+          label.className = "allocation-row";
           label.append(meter);
-          results.append(label, node("br"));
+          results.append(label);
         }
       });
     }

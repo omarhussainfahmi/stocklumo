@@ -195,9 +195,9 @@ test("portfolio form saves a verified lot, calculates value, and removes it", as
     JSON.parse(w.localStorage.getItem("stocklumo.portfolio")).length,
     1,
   );
-  assert.match(
-    w.document.querySelector("#research-results").textContent,
-    /Unrealized P\/L: 10/,
+  assert.deepEqual(
+    [...w.document.querySelectorAll(".portfolio-metrics dd")].map(n => n.textContent),
+    ["20", "30", "+10"],
   );
   [...w.document.querySelectorAll("#research-results button")]
     .find((b) => b.textContent === "Remove")
@@ -284,5 +284,41 @@ test("earnings filters the watchlist and preserves missing actuals instead of ze
   assert.equal(rows.length, 1);
   assert.match(rows[0].textContent, /AAPL/);
   assert.match(rows[0].textContent, /Unavailable/);
+  w.close();
+});
+
+test("comparison renders labeled shared-scale charts and keeps unavailable history explicit", async () => {
+  const dom = new JSDOM(readFileSync("MarketDesk/Views/Market/Index.cshtml", "utf8"), {
+    url: "https://example.test/compare", runScripts: "outside-only",
+  });
+  const w = dom.window;
+  w.StocklumoMath = math;
+  let missing = false, requests = 0;
+  w.fetch = async (url) => {
+    requests++;
+    return { ok: true, json: async () => url.includes("/chart")
+      ? { state: missing ? "unavailable" : "ok", data: missing ? null : { s: "ok", c: [10, 12], t: [1700000000, 1700086400] } }
+      : { state: "ok", symbol: url.split("/").at(-1), price: 12, currency: "USD", changePercent: 2, timestamp: 1700086400 } };
+  };
+  w.eval(readFileSync("MarketDesk/wwwroot/js/research.js", "utf8"));
+  const run = [...w.document.querySelectorAll("button")].find(b => b.textContent === "Compare");
+  run.click();
+  await new Promise(r => setTimeout(r, 20));
+  assert.equal(w.document.querySelectorAll(".research-chart path").length, 2);
+  assert.equal(w.document.querySelectorAll(".chart-axis-label").length, 3);
+  assert.deepEqual([...w.document.querySelectorAll(".chart-legend span")].map(n => n.textContent.trim()), ["AAPL", "MSFT"]);
+  assert.notEqual(w.document.querySelectorAll(".research-chart path")[0].getAttribute("stroke-dasharray"), w.document.querySelectorAll(".research-chart path")[1].getAttribute("stroke-dasharray"));
+  assert.match(w.document.querySelector(".research-chart").getAttribute("aria-label"), /base 100/);
+  assert.equal(w.document.querySelectorAll("details tbody tr").length, 4);
+  missing = true;
+  run.click();
+  await new Promise(r => setTimeout(r, 20));
+  assert.equal(w.document.querySelector(".research-chart"), null);
+  assert.match(w.document.querySelector("#research-results").textContent, /Historical comparison unavailable/);
+  const before = requests;
+  w.document.querySelector("#research-controls input").value = "AAPL";
+  run.click();
+  assert.equal(requests, before);
+  assert.match(w.document.querySelector("#research-status").textContent, /2 to 5/);
   w.close();
 });

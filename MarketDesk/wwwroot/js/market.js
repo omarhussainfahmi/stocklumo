@@ -8,6 +8,8 @@
   const verifiedSymbols = new Set();
   const history = [];
   const spotlightSymbols = new Set();
+  const featuredSymbols = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META"];
+  let pulseSignature = "";
   let watch = readList("stocklumo.watch");
   let recent = readList("stocklumo.recent");
   let profile = {};
@@ -216,6 +218,7 @@
       row.querySelector(".age").textContent = age(item);
     });
     renderFeedState();
+    renderMarketPulse();
     if (!symbol) return;
     const item = prices.get(symbol);
     if (!item) return;
@@ -256,7 +259,45 @@
       container.append(group);
     }
   }
+  function renderMarketPulse() {
+    if ($("market-pulse").hidden) return;
+    const stocks = featuredSymbols.map(ticker => prices.get(ticker));
+    $("summary-quotes").textContent = `${stocks.filter(s => number(s?.price) && s.price > 0).length} / ${featuredSymbols.length}`;
+    const signature = JSON.stringify(stocks.map(s => [s?.changePercent, s?.updatedAt]));
+    if (signature === pulseSignature) return;
+    pulseSignature = signature;
+    const limit = Math.max(1, ...stocks.map(s => number(s?.changePercent) ? Math.abs(s.changePercent) : 0));
+    $("pulse-bars").replaceChildren();
+    featuredSymbols.forEach((ticker, index) => {
+      const stock = stocks[index], value = stock?.changePercent;
+      const row = element("div", undefined, "pulse-row");
+      const link = element("a", ticker);
+      link.href = `/stock/${ticker}`;
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox", "0 0 200 20");
+      svg.setAttribute("aria-hidden", "true");
+      const axis = document.createElementNS(svg.namespaceURI, "line");
+      axis.setAttribute("x1", "100"); axis.setAttribute("x2", "100");
+      axis.setAttribute("y1", "0"); axis.setAttribute("y2", "20");
+      svg.append(axis);
+      const label = element("span", "Unavailable");
+      if (number(value)) {
+        const bar = document.createElementNS(svg.namespaceURI, "rect");
+        const width = Math.abs(value) / limit * 95;
+        bar.setAttribute("x", String(value < 0 ? 100 - width : 100));
+        bar.setAttribute("y", "5"); bar.setAttribute("width", String(width));
+        bar.setAttribute("height", "10");
+        svg.classList.add(value < 0 ? "down" : "up");
+        svg.append(bar);
+        movement(label, value, `${signed(value)}%`);
+      }
+      row.title = stock?.updatedAt ? `Quote time: ${stamp(stock.updatedAt)}` : "No quote available";
+      row.append(link, svg, label);
+      $("pulse-bars").append(row);
+    });
+  }
   function renderWatch() {
+    $("summary-watch").textContent = String(watch.length);
     $("watch-rows").replaceChildren();
     $("watch-empty").hidden = watch.length > 0;
     $("watch-table").hidden = !watch.length;
@@ -307,6 +348,7 @@
     updatePrices();
   }
   function renderRecent() {
+    $("summary-recent").textContent = String(recent.length);
     $("recent").replaceChildren();
     if (!recent.length)
       $("recent").append(
@@ -755,6 +797,17 @@
       link.setAttribute("aria-current", "page");
   });
   const page = location.pathname;
+  document.body.dataset.page = symbol ? "stock" : page === "/" ? "home" : page.slice(1);
+  $("market-pulse").hidden = !["/", "/markets"].includes(page);
+  $("workspace-summary").hidden = page !== "/";
+  $("intro-actions").hidden = page !== "/";
+  $("toolkit").hidden = page !== "/";
+  const introductions = {
+    "/watchlist": "The companies you follow, with current quote availability and timestamps. Saved on this browser.",
+    "/news": "Company developments and market reporting, with links to the original publishers.",
+    "/markets": "Explore selected US companies and their latest available movements. Start with a symbol, then look closer."
+  };
+  if (introductions[page]) $("intro-description").textContent = introductions[page];
   if (symbol) {
     $("overview").hidden = true;
     $("page-title").textContent = "Find your next perspective.";
@@ -793,7 +846,7 @@
     lastSpotlightAttempt = Date.now();
     $("ticker-stocks").replaceChildren();
     $("spotlight").replaceChildren();
-    for (const ticker of ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META"]) {
+    for (const ticker of featuredSymbols) {
       const block = element("article", undefined, "spotlight-stock");
       block.dataset.priceSymbol = ticker;
       const heading = element("h3");

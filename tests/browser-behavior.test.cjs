@@ -110,6 +110,32 @@ test("explore more reveals and collapses the additional companies", async () => 
   dom.window.close();
 });
 
+test("market snapshot uses existing quotes, a shared scale and honest unavailable states", async () => {
+  const dom = page({ dashboard: true, storedWatch: ["AAPL"] });
+  await settle();
+  const d = dom.window.document;
+  assert.equal(d.getElementById("summary-quotes").textContent, "6 / 6");
+  assert.equal(d.getElementById("summary-watch").textContent, "1");
+  const count = dom.requests.length;
+  dom.streams.at(-1).onmessage({ data: JSON.stringify({ status: "connected", stocks: [
+    { symbol: "AAPL", price: 100, changePercent: -2, updatedAt: new Date().toISOString() },
+    { symbol: "MSFT", price: 200, changePercent: 4, updatedAt: new Date().toISOString() }
+  ] }) });
+  const rows = d.querySelectorAll(".pulse-row");
+  assert.equal(rows[0].querySelector("span").textContent, "-2.00%");
+  assert.equal(rows[1].querySelector("span").textContent, "+4.00%");
+  assert.equal(Number(rows[1].querySelector("rect").getAttribute("width")), 2 * Number(rows[0].querySelector("rect").getAttribute("width")));
+  assert.equal(rows[0].querySelector("a").getAttribute("href"), "/stock/AAPL");
+  assert.equal(dom.requests.length, count);
+  dom.window.close();
+  const missing = page({ dashboard: true, missing: true });
+  await settle();
+  assert.equal(missing.window.document.getElementById("summary-quotes").textContent, "0 / 6");
+  assert.equal(missing.window.document.querySelectorAll(".pulse-row rect").length, 0);
+  assert.ok([...missing.window.document.querySelectorAll(".pulse-row span")].every(n => n.textContent === "Unavailable"));
+  missing.window.close();
+});
+
 test("stock profile, quote and recently viewed use supplied data", async () => {
   const dom = page();
   await settle();
