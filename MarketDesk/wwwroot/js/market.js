@@ -8,7 +8,7 @@
   const verifiedSymbols = new Set();
   const history = [];
   const spotlightSymbols = new Set();
-  const featuredSymbols = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META"];
+  const featuredSymbols = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "JPM"];
   let pulseSignature = "";
   let watch = readList("stocklumo.watch");
   let recent = readList("stocklumo.recent");
@@ -263,6 +263,10 @@
     if ($("market-pulse").hidden) return;
     const stocks = featuredSymbols.map(ticker => prices.get(ticker));
     $("summary-quotes").textContent = `${stocks.filter(s => number(s?.price) && s.price > 0).length} / ${featuredSymbols.length}`;
+    const movements = stocks.filter(s => number(s?.price) && s.price > 0 && number(s?.changePercent));
+    $("summary-rising").textContent = movements.length ? String(movements.filter(s => s.changePercent > 0).length) : "-";
+    $("summary-falling").textContent = movements.length ? String(movements.filter(s => s.changePercent < 0).length) : "-";
+    $("summary-flat").textContent = movements.length ? String(movements.filter(s => s.changePercent === 0).length) : "-";
     const signature = JSON.stringify(stocks.map(s => [s?.changePercent, s?.updatedAt]));
     if (signature === pulseSignature) return;
     pulseSignature = signature;
@@ -861,7 +865,7 @@
       tickerLink.dataset.priceSymbol = ticker;
       tickerLink.append(element("strong", ticker), element("span", "-", "last"), element("span", "-", "delta"), element("span", "Waiting for a price", "age"));
       $("ticker-stocks").append(tickerLink);
-      if (!$("overview").hidden && ["AAPL", "MSFT", "NVDA"].includes(ticker)) $("spotlight").append(block);
+      if (!$("overview").hidden) $("spotlight").append(block);
       const result = await get("/api/data/stock/" + ticker + "/profile");
       if (result.state !== "ok" || result.data?.ticker !== ticker) {
         name.textContent = result.message || "Company information unavailable.";
@@ -913,7 +917,7 @@
         connect();
       }
     }
-    if (spotlightSymbols.size < 6 && Date.now() - lastSpotlightAttempt >= 60000) loadSpotlight();
+    if (spotlightSymbols.size < featuredSymbols.length && Date.now() - lastSpotlightAttempt >= 60000) loadSpotlight();
     updatePrices();
   }, 5000);
   document.addEventListener("visibilitychange", () => {
@@ -923,7 +927,7 @@
     }
   });
   window.addEventListener("online", () => {
-    if (spotlightSymbols.size < 6) loadSpotlight();
+    if (spotlightSymbols.size < featuredSymbols.length) loadSpotlight();
     else connect();
     refreshMarketStatus();
   });

@@ -114,14 +114,21 @@ test("market snapshot uses existing quotes, a shared scale and honest unavailabl
   const dom = page({ dashboard: true, storedWatch: ["AAPL"] });
   await settle();
   const d = dom.window.document;
-  assert.equal(d.getElementById("summary-quotes").textContent, "6 / 6");
+  assert.equal(d.getElementById("summary-quotes").textContent, "8 / 8");
+  assert.equal(d.querySelectorAll("#spotlight .spotlight-stock").length, 8);
+  assert.equal(d.getElementById("summary-rising").textContent, "8");
   assert.equal(d.getElementById("summary-watch").textContent, "1");
   const count = dom.requests.length;
   dom.streams.at(-1).onmessage({ data: JSON.stringify({ status: "connected", stocks: [
     { symbol: "AAPL", price: 100, changePercent: -2, updatedAt: new Date().toISOString() },
-    { symbol: "MSFT", price: 200, changePercent: 4, updatedAt: new Date().toISOString() }
+    { symbol: "MSFT", price: 200, changePercent: 4, updatedAt: new Date().toISOString() },
+    { symbol: "TSLA", price: 100, changePercent: 0, updatedAt: new Date().toISOString() }
   ] }) });
   const rows = d.querySelectorAll(".pulse-row");
+  assert.equal(rows.length, 8);
+  assert.equal(d.getElementById("summary-rising").textContent, "6");
+  assert.equal(d.getElementById("summary-falling").textContent, "1");
+  assert.equal(d.getElementById("summary-flat").textContent, "1");
   assert.equal(rows[0].querySelector("span").textContent, "-2.00%");
   assert.equal(rows[1].querySelector("span").textContent, "+4.00%");
   assert.equal(Number(rows[1].querySelector("rect").getAttribute("width")), 2 * Number(rows[0].querySelector("rect").getAttribute("width")));
@@ -130,7 +137,9 @@ test("market snapshot uses existing quotes, a shared scale and honest unavailabl
   dom.window.close();
   const missing = page({ dashboard: true, missing: true });
   await settle();
-  assert.equal(missing.window.document.getElementById("summary-quotes").textContent, "0 / 6");
+  assert.equal(missing.window.document.getElementById("summary-quotes").textContent, "0 / 8");
+  for (const id of ["summary-rising", "summary-falling", "summary-flat"])
+    assert.equal(missing.window.document.getElementById(id).textContent, "-");
   assert.equal(missing.window.document.querySelectorAll(".pulse-row rect").length, 0);
   assert.ok([...missing.window.document.querySelectorAll(".pulse-row span")].every(n => n.textContent === "Unavailable"));
   missing.window.close();
