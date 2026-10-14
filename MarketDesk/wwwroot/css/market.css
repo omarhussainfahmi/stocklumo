@@ -147,7 +147,8 @@ body:not([data-symbol=""]) .intro h1, body:not([data-symbol=""]) .intro .eyebrow
 .section-title > span { font: 11px/1.6 var(--mono); color: var(--muted); letter-spacing: .04em; }
 .spotlight { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; border: 1px solid var(--line); background: var(--line); }
 .spotlight-stock { padding: 14px 16px; background: var(--panel); }
-.spotlight-stock, .tool-grid > a { border-top: 2px solid var(--green); }
+.spotlight { border-top: 2px solid var(--green); }
+.tool-grid > a { border-top: 2px solid var(--green); }
 .spotlight-stock h3 { font: 700 14px var(--mono); margin: 0; }
 .spotlight-stock h3 a { text-decoration: none; }
 .spotlight-stock strong { display: block; font: 500 clamp(22px, 2vw, 30px)/1.4 var(--mono); letter-spacing: -.06em; margin-top: 8px; }
