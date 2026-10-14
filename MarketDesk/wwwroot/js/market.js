@@ -798,6 +798,7 @@
   });
   const page = location.pathname;
   document.body.dataset.page = symbol ? "stock" : page === "/" ? "home" : page.slice(1);
+  if (page === "/") document.querySelector(".intro").after($("market-pulse"));
   $("market-pulse").hidden = !["/", "/markets"].includes(page);
   $("workspace-summary").hidden = page !== "/";
   $("intro-actions").hidden = page !== "/";
