@@ -41,10 +41,13 @@
   --series-slate: #a6bcc5;
 }
 * { box-sizing: border-box; scrollbar-color: var(--green) var(--paper); }
-html { scroll-padding-top: var(--header-offset); scrollbar-width: auto; }
-::-webkit-scrollbar { width: 12px; height: 12px; }
+html { scroll-padding-top: var(--header-offset); scrollbar-width: thin; }
+@supports selector(::-webkit-scrollbar) {
+  html { scrollbar-width: auto; scrollbar-color: auto; }
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--paper); }
-::-webkit-scrollbar-thumb { background: var(--green); border: 3px solid var(--paper); border-radius: 8px; }
+::-webkit-scrollbar-thumb { background: var(--green); border: 1px solid var(--paper); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 :target { scroll-margin-top: 16px; }
 body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.6 var(--font); }
