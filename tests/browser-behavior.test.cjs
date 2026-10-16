@@ -7,7 +7,7 @@ const script = readFileSync("MarketDesk/wwwroot/js/market.js", "utf8");
 const settle = () => new Promise((resolve) => setTimeout(resolve, 30));
 
 // Synthetic values are test fixtures only. They never ship as application data.
-function page({ missing = false, quoteWait, storedWatch = [], dashboard = false, marketOpen = false } = {}) {
+function page({ missing = false, quoteWait, storedWatch = [], dashboard = false, marketOpen = false, universeCount = 5000, selection = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "JPM"], missingQuote } = {}) {
   const dom = new JSDOM(html, {
     url: dashboard ? "http://localhost/" : "http://localhost/stock/AAPL",
     runScripts: "outside-only",
@@ -34,6 +34,7 @@ function page({ missing = false, quoteWait, storedWatch = [], dashboard = false,
     dom.requests.push(url);
     let body;
     if (missing) body = { state: "setup", message: "API key required" };
+    else if (url === "/api/universe") body = { state: "ok", count: universeCount, exchanges: 3, retrievedAt: "2026-10-16T10:00:00Z", selection: selection.map(symbol => ({ symbol })) };
     else if (url.includes("/profile"))
       body = {
         state: "ok",
@@ -50,7 +51,7 @@ function page({ missing = false, quoteWait, storedWatch = [], dashboard = false,
       if (quoteWait) await quoteWait;
       body = {
         state: "ok",
-        data: { c: 100, pc: 90, o: 95, h: 105, l: 92, t: 1700000000 },
+        data: url.includes(`/${missingQuote}/`) ? null : { c: 100, pc: 90, o: 95, h: 105, l: 92, t: 1700000000 },
       };
     } else if (url.includes("/chart"))
       body = {
@@ -116,7 +117,8 @@ test("market snapshot uses existing quotes, a shared scale and honest unavailabl
   const d = dom.window.document;
   assert.equal(d.getElementById("summary-quotes").textContent, "8 / 8");
   assert.equal(d.querySelectorAll("#spotlight .spotlight-stock").length, 8);
-  assert.equal(d.getElementById("summary-rising").textContent, "8");
+  assert.equal(d.getElementById("summary-universe").textContent, "5,000");
+  assert.equal(d.getElementById("summary-live").textContent, "0");
   assert.equal(d.getElementById("summary-watch").textContent, "1");
   const count = dom.requests.length;
   dom.streams.at(-1).onmessage({ data: JSON.stringify({ status: "connected", stocks: [
@@ -126,9 +128,8 @@ test("market snapshot uses existing quotes, a shared scale and honest unavailabl
   ] }) });
   const rows = d.querySelectorAll(".pulse-row");
   assert.equal(rows.length, 8);
-  assert.equal(d.getElementById("summary-rising").textContent, "6");
-  assert.equal(d.getElementById("summary-falling").textContent, "1");
-  assert.equal(d.getElementById("summary-flat").textContent, "1");
+  assert.equal(d.getElementById("summary-universe").textContent, "5,000");
+  assert.equal(d.getElementById("summary-live").textContent, "0");
   assert.equal(rows[0].querySelector("span").textContent, "-2.00%");
   assert.equal(rows[1].querySelector("span").textContent, "+4.00%");
   assert.equal(Number(rows[1].querySelector("rect").getAttribute("width")), 2 * Number(rows[0].querySelector("rect").getAttribute("width")));
@@ -137,8 +138,8 @@ test("market snapshot uses existing quotes, a shared scale and honest unavailabl
   dom.window.close();
   const missing = page({ dashboard: true, missing: true });
   await settle();
-  assert.equal(missing.window.document.getElementById("summary-quotes").textContent, "0 / 8");
-  for (const id of ["summary-rising", "summary-falling", "summary-flat"])
+  assert.equal(missing.window.document.getElementById("summary-quotes").textContent, "-");
+  for (const id of ["summary-universe", "summary-exchanges", "summary-live"])
     assert.equal(missing.window.document.getElementById(id).textContent, "-");
   assert.equal(missing.window.document.querySelectorAll(".pulse-row rect").length, 0);
   assert.ok([...missing.window.document.querySelectorAll(".pulse-row span")].every(n => n.textContent === "Unavailable"));
@@ -309,8 +310,8 @@ test("a stalled stream is replaced and closed-market prices are explained", asyn
 });
 test("failed ticker initialization retries and starts streaming when profiles recover",async()=>{
   const dom=page({missing:true,dashboard:true});await settle();
-  dom.window.fetch=async url=>({ok:true,json:async()=>url.endsWith('/profile')?{state:'ok',data:{ticker:url.split('/')[4],currency:'USD',name:'Fixture'}}:{state:'ok',data:{c:100,pc:90,t:1700000000}}});
-  const now=dom.window.Date.now();dom.window.Date.now=()=>now+61000;dom.timers.at(-1)();await settle();
+  dom.window.fetch=async url=>({ok:true,json:async()=>url === '/api/universe' ? {state:'ok',count:10,exchanges:1,selection:[{symbol:'META'}]} : url.endsWith('/profile')?{state:'ok',data:{ticker:url.split('/')[4],currency:'USD',name:'Fixture'}}:{state:'ok',data:{c:100,pc:90,t:1700000000}}});
+  const now=dom.window.Date.now();dom.window.Date.now=()=>now+301000;dom.timers.at(-1)();await settle();
   assert.match(decodeURIComponent(dom.streams.at(-1).url),/META/);
   assert.match(dom.window.document.querySelector('#ticker-stocks .last').textContent,/100/);dom.window.close();
 });
@@ -326,6 +327,7 @@ test("a handshake and heartbeats cannot claim live; only a fresh received US tra
   assert.equal(label.textContent, "STALE");
   send([{ symbol: "AAPL", price: 102, updatedAt, source: "Trade", tradeReceivedAt: updatedAt }]);
   assert.equal(label.textContent, "LIVE");
+  assert.equal(w.document.getElementById("summary-live").textContent, "1");
   assert.match(w.document.querySelector('#ticker-stocks .age').textContent, /live/);
   const start = w.Date.now(); w.Date.now = () => start + 181000;
   await dom.timers[0](); send([]); assert.equal(label.textContent, "STALE");
@@ -362,4 +364,18 @@ test("market status expires instead of assuming an old closure is still valid", 
   const initial=w.Date.now(); w.Date.now=()=>initial+121000; send();
   assert.equal(w.document.getElementById("connection").textContent,"STALE");
   assert.match(w.document.getElementById("notice").textContent,/could not be verified/); dom.window.close();
+});
+
+test("provider selection and universe count remain independent of partial quote coverage", async () => {
+  const dom = page({ dashboard: true, universeCount: 12000, selection: ["ABC", "XYZ"], missingQuote: "XYZ" });
+  await settle();
+  const d = dom.window.document;
+  assert.equal(d.getElementById("summary-universe").textContent, "12,000");
+  assert.equal(d.getElementById("summary-quotes").textContent, "1 / 2");
+  assert.equal(d.getElementById("summary-live").textContent, "0");
+  assert.deepEqual([...d.querySelectorAll(".spotlight-stock")].map(n => n.dataset.priceSymbol), ["ABC", "XYZ"]);
+  dom.timers.forEach(fn => fn());
+  await settle();
+  assert.equal(dom.requests.filter(url => url === "/api/universe").length, 1);
+  dom.window.close();
 });

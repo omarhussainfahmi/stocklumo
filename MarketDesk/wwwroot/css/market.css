@@ -233,10 +233,6 @@ summary { cursor: pointer; padding: 12px; background: var(--panel); border: 1px 
 .portfolio-metrics > div { padding: 20px; border-right: 1px solid var(--line); }
 .portfolio-metrics > div:last-child { border: 0; }
 .portfolio-metrics dd { font: 500 clamp(20px, 2.5vw, 32px)/1.4 var(--mono); }
-.allocation-row { display: grid; grid-template-columns: 130px minmax(0, 1fr); align-items: center; gap: 16px; max-width: 700px; margin: 14px 0; font: 13px var(--mono); }
-meter { width: 100%; height: 12px; accent-color: var(--green); }
-meter::-webkit-meter-bar { background: var(--line); border: 0; border-radius: 2px; }
-meter::-webkit-meter-optimum-value { background: var(--green); }
 .footer { padding: 36px var(--gutter) 20px; border-top: 1px solid var(--line); background: var(--panel); }
 .footer-main { display: grid; grid-template-columns: 2fr 1fr 1.4fr; gap: 40px; }
 .footer-about p { max-width: 430px; color: var(--muted); font-size: 13px; }
@@ -336,4 +332,43 @@ meter::-webkit-meter-optimum-value { background: var(--green); }
 @media (prefers-reduced-motion: reduce) {
   button, .button-link { transition: none; }
   #connection[data-state="live"]::before { animation: none; }
+}
+
+/* Data views share existing palette and SVG rendering; no chart dependency. */
+.data-figure { margin: 22px 0; padding: 20px; border: 1px solid var(--line); border-top: 2px solid var(--green); background: var(--panel); }
+.data-figure h2 { font-size: 18px; margin: 0 0 8px; }
+.data-figure figcaption, .chart-detail { color: var(--muted); font-size: 13px; line-height: 1.6; }
+.bar-list { margin-top: 18px; }
+.data-bar { display: grid; grid-template-columns: 90px minmax(80px, 1fr) 130px; gap: 14px; align-items: center; padding: 9px 6px; border-bottom: 1px solid var(--line); text-decoration: none; color: var(--ink); font: 13px var(--mono); }
+.data-bar:hover, .data-bar:focus-visible { background: var(--surface); }
+.data-bar > span { text-align: right; }
+.data-bar svg { width: 100%; height: 24px; }
+.data-bar line { stroke: var(--muted); stroke-width: 1; }
+.data-bar rect { fill: currentColor; }
+.chart-detail { min-height: 2.8em; overflow-wrap: anywhere; }
+.chart-date-control { display: flex; gap: 16px; align-items: center; margin-top: 12px; font-size: 13px; }
+.chart-date-control input { flex: 1; min-width: 80px; accent-color: var(--green); }
+.allocation-layout { display: grid; grid-template-columns: minmax(180px, 280px) 1fr; align-items: center; gap: 32px; }
+.allocation-layout > svg { width: 100%; max-width: 280px; }
+.donut-total { fill: var(--ink); font: 600 19px var(--mono); }
+.allocation-layout ol { margin: 0; padding-left: 24px; }
+.allocation-layout li { padding: 10px 0; border-bottom: 1px solid var(--line); font: 13px var(--mono); }
+.allocation-layout li strong, .allocation-layout li span { margin-left: 18px; }
+.allocation-layout li small { display: block; margin-top: 5px; color: var(--muted); }
+.earnings-timeline > details { margin: 12px 0 0; }
+.earnings-timeline summary { font: 600 14px var(--mono); color: var(--green); }
+.earnings-timeline summary span { float: right; color: var(--muted); font-size: 12px; }
+.earnings-events { max-height: 360px; overflow-y: auto; margin-top: 12px; border-left: 1px solid var(--green); padding-left: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.earnings-events article { padding: 16px; border: 1px solid var(--line); background: var(--surface); }
+.earnings-events h4 { margin: 0; }
+.earnings-events p, .earnings-events span { font-size: 12px; color: var(--muted); }
+.earnings-events dl { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 0; }
+.earnings-events dt { font-size: 12px; color: var(--muted); }
+.earnings-events dd.missing-value { font: 12px/1.6 var(--font); color: var(--muted); }
+.earnings-events dd { margin: 5px 0 0; font: 600 17px var(--mono); }
+@media (max-width: 600px) {
+  .data-figure { padding: 14px; }
+  .data-bar { grid-template-columns: 58px minmax(60px, 1fr) 94px; gap: 6px; font-size: 12px; }
+  .allocation-layout { grid-template-columns: 1fr; gap: 10px; }
+  .allocation-layout > svg { margin: auto; }
 }

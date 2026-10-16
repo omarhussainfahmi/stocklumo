@@ -17,6 +17,8 @@ test("screener loads real response fields and supports reset and saved presets",
       name: "Fixture",
       currency: "USD",
       price: 20,
+      changePercent: url.endsWith("AAPL") ? -2 : 3,
+      timestamp: 1700000000,
       industry: "Technology",
       state: "ok",
     }),
@@ -27,6 +29,8 @@ test("screener loads real response fields and supports reset and saved presets",
     w.document.querySelectorAll("#research-results tbody tr").length,
     12,
   );
+  assert.equal(w.document.querySelectorAll(".data-bar").length, 12);
+  assert.match(w.document.querySelector(".data-bar").title, /Quote .*UTC/);
   const input = w.document.querySelector("#research-controls input");
   input.value = "AAPL";
   input.dispatchEvent(new w.Event("input"));
@@ -34,6 +38,12 @@ test("screener loads real response fields and supports reset and saved presets",
     w.document.querySelectorAll("#research-results tbody tr").length,
     1,
   );
+  assert.equal(w.document.querySelectorAll(".data-bar").length, 1);
+  assert.equal(w.document.querySelector(".data-bar").getAttribute("href"), "/stock/AAPL");
+  assert.match(w.document.querySelector(".data-bar").textContent, /-2 %/);
+  input.value = "NO MATCH"; input.dispatchEvent(new w.Event("input"));
+  assert.equal(w.document.querySelector(".data-bar"), null);
+  input.value = "AAPL"; input.dispatchEvent(new w.Event("input"));
   const click = (name) =>
     [...w.document.querySelectorAll("button")]
       .find((b) => b.textContent === name)
@@ -199,6 +209,10 @@ test("portfolio form saves a verified lot, calculates value, and removes it", as
     [...w.document.querySelectorAll(".portfolio-metrics dd")].map(n => n.textContent),
     ["20", "30", "+10"],
   );
+  assert.equal(w.document.querySelectorAll(".allocation-chart circle").length, 1);
+  assert.equal(w.document.querySelector(".allocation-chart circle").getAttribute("stroke-dasharray"), "100 0");
+  assert.match(w.document.querySelector(".allocation-chart li").textContent, /100%/);
+  assert.match(w.document.querySelector(".data-bar").textContent, /\+10 USD/);
   [...w.document.querySelectorAll("#research-results button")]
     .find((b) => b.textContent === "Remove")
     .click();
@@ -284,6 +298,9 @@ test("earnings filters the watchlist and preserves missing actuals instead of ze
   assert.equal(rows.length, 1);
   assert.match(rows[0].textContent, /AAPL/);
   assert.match(rows[0].textContent, /Unavailable/);
+  assert.equal(w.document.querySelectorAll(".earnings-events article").length, 1);
+  assert.match(w.document.querySelector(".earnings-events article").textContent, /EPS actual unavailable/);
+  assert.equal(w.document.querySelector(".earnings-timeline time").dateTime, "2026-11-02");
   w.close();
 });
 
@@ -310,15 +327,67 @@ test("comparison renders labeled shared-scale charts and keeps unavailable histo
   assert.notEqual(w.document.querySelectorAll(".research-chart path")[0].getAttribute("stroke-dasharray"), w.document.querySelectorAll(".research-chart path")[1].getAttribute("stroke-dasharray"));
   assert.match(w.document.querySelector(".research-chart").getAttribute("aria-label"), /base 100/);
   assert.equal(w.document.querySelectorAll("details tbody tr").length, 4);
+  const slider = w.document.querySelector(".chart-date-control input");
+  slider.value = "1"; slider.dispatchEvent(new w.Event("input"));
+  assert.match(w.document.querySelector(".chart-detail").textContent, /AAPL: 120.*MSFT: 120/);
   missing = true;
   run.click();
   await new Promise(r => setTimeout(r, 20));
   assert.equal(w.document.querySelector(".research-chart"), null);
+  assert.deepEqual([...w.document.querySelectorAll(".data-bar strong")].map(n => n.textContent), ["AAPL", "MSFT"]);
+  assert.match(w.document.querySelector(".bar-chart figcaption").textContent, /not a historical return/);
   assert.match(w.document.querySelector("#research-results").textContent, /Historical comparison unavailable/);
   const before = requests;
   w.document.querySelector("#research-controls input").value = "AAPL";
   run.click();
   assert.equal(requests, before);
   assert.match(w.document.querySelector("#research-status").textContent, /2 to 5/);
+  w.close();
+});
+
+async function researchPage(path, response, holdings) {
+  const dom = new JSDOM(readFileSync("MarketDesk/Views/Market/Index.cshtml", "utf8"), { url: `https://example.test/${path}`, runScripts: "outside-only" });
+  const w = dom.window;
+  w.StocklumoMath = math; w.setInterval = () => 0;
+  if (holdings) w.localStorage.setItem("stocklumo.portfolio", JSON.stringify(holdings));
+  w.fetch = async url => ({ ok: true, json: async () => response(url) });
+  w.eval(readFileSync("MarketDesk/wwwroot/js/research.js", "utf8"));
+  await new Promise(r => setTimeout(r, 25));
+  return dom;
+}
+test("portfolio chart aggregates lots by stock, keeps currencies apart, and suppresses incomplete totals", async () => {
+  const holdings = [
+    {symbol:"AAA",currency:"USD",quantity:2,purchasePrice:10,date:"2020-01-01"},
+    {symbol:"AAA",currency:"USD",quantity:1,purchasePrice:10,date:"2020-01-01"},
+    {symbol:"BBB",currency:"USD",quantity:1,purchasePrice:10,date:"2020-01-01"},
+    {symbol:"CCC",currency:"EUR",quantity:1,purchasePrice:10,date:"2020-01-01"}];
+  const response = url => ({ symbol:url.split("/").at(-1), currency:url.endsWith("CCC")?"EUR":"USD",price:20,timestamp:1700000000 });
+  const dom = await researchPage("portfolio",response,holdings);
+  const charts=dom.window.document.querySelectorAll(".allocation-chart");
+  assert.equal(charts.length,2);
+  assert.deepEqual([...charts[0].querySelectorAll("li strong")].map(n=>n.textContent),["75%","25%"]);
+  assert.equal(charts[1].querySelector("li strong").textContent,"100%");
+  dom.window.close();
+  const partial=await researchPage("portfolio",url=>url.endsWith("BBB")?{state:"error"}:response(url),holdings);
+  assert.equal(partial.window.document.querySelectorAll(".allocation-chart").length,1);
+  assert.match(partial.window.document.querySelector(".allocation-chart h2").textContent,/EUR/);
+  assert.match(partial.window.document.querySelector("#research-results").textContent,/allocation unavailable/);
+  partial.window.close();
+  const empty=await researchPage("portfolio",response,[]);
+  assert.equal(empty.window.document.querySelector(".data-figure"),null);
+  empty.window.close();
+});
+test("earnings empty ranges and fiscal quarters never produce announcement timelines", async () => {
+  const dom=await researchPage("earnings",()=>({state:"ok",data:{earningsCalendar:[]}}));
+  const w=dom.window,run=[...w.document.querySelectorAll("button")].find(b=>b.textContent==="Load earnings");
+  run.click();await new Promise(r=>setTimeout(r,20));
+  assert.equal(w.document.querySelector(".earnings-timeline"),null);
+  assert.match(w.document.querySelector("#research-results").textContent,/No earnings found/);
+  w.document.querySelector("#research-controls input").value="AAA";
+  w.document.querySelector("#research-controls select").value="reported";
+  w.fetch=async()=>({ok:true,json:async()=>({state:"ok",data:[{symbol:"AAA",period:"2026-09-30",actual:2}]})});
+  run.click();await new Promise(r=>setTimeout(r,20));
+  assert.equal(w.document.querySelector(".earnings-timeline"),null);
+  assert.match(w.document.querySelector("#research-results").textContent,/Fiscal period end/);
   w.close();
 });

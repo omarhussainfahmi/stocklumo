@@ -8,7 +8,7 @@
   const verifiedSymbols = new Set();
   const history = [];
   const spotlightSymbols = new Set();
-  const featuredSymbols = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "JPM"];
+  let featuredSymbols = [];
   let pulseSignature = "";
   let watch = readList("stocklumo.watch");
   let recent = readList("stocklumo.recent");
@@ -262,11 +262,8 @@
   function renderMarketPulse() {
     if ($("market-pulse").hidden) return;
     const stocks = featuredSymbols.map(ticker => prices.get(ticker));
-    $("summary-quotes").textContent = `${stocks.filter(s => number(s?.price) && s.price > 0).length} / ${featuredSymbols.length}`;
-    const movements = stocks.filter(s => number(s?.price) && s.price > 0 && number(s?.changePercent));
-    $("summary-rising").textContent = movements.length ? String(movements.filter(s => s.changePercent > 0).length) : "-";
-    $("summary-falling").textContent = movements.length ? String(movements.filter(s => s.changePercent < 0).length) : "-";
-    $("summary-flat").textContent = movements.length ? String(movements.filter(s => s.changePercent === 0).length) : "-";
+    $("summary-quotes").textContent = featuredSymbols.length ? `${stocks.filter(s => number(s?.price) && s.price > 0).length} / ${featuredSymbols.length}` : "-";
+    $("summary-live").textContent = featuredSymbols.length ? String(stocks.filter(s => s && freshness(s) === "live").length) : "-";
     const signature = JSON.stringify(stocks.map(s => [s?.changePercent, s?.updatedAt]));
     if (signature === pulseSignature) return;
     pulseSignature = signature;
@@ -849,6 +846,22 @@
     spotlightLoading = true;
     initializationError = false;
     lastSpotlightAttempt = Date.now();
+    if (!featuredSymbols.length) {
+      const universe = await get("/api/universe");
+      if (!pageActive) { spotlightLoading = false; return; }
+      $("universe-note").hidden = $("workspace-summary").hidden;
+      $("summary-universe").textContent = Number.isInteger(universe.count) ? universe.count.toLocaleString() : "-";
+      $("summary-exchanges").textContent = Number.isInteger(universe.exchanges) ? String(universe.exchanges) : "-";
+      const retrieved = universe.retrievedAt && Number.isFinite(Date.parse(universe.retrievedAt)) ? new Date(universe.retrievedAt).toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC") : "Unavailable";
+      $("universe-note").textContent = `Finnhub US symbol metadata: ${universe.state === "stale" ? "STALE cached" : "retrieved"} ${retrieved}. USD common stocks on Nasdaq, NYSE and NYSE American; excludes OTC, funds and other security types. Metadata refreshes every 24 hours and does not establish quote access. Market-wide advances/declines are unavailable without individual quotes across this universe. ${universe.message || ""}`;
+      featuredSymbols = Array.isArray(universe.selection) ? [...new Set(universe.selection.map(s => s.symbol).filter(validSymbol))].slice(0, 8) : [];
+      if (!featuredSymbols.length) {
+        $("spotlight").replaceChildren(element("p", universe.message || "No eligible provider symbols available.", "muted"));
+        $("ticker-stocks").replaceChildren(element("p", "Stock selection unavailable.", "caption"));
+        spotlightLoading = false;
+        return;
+      }
+    }
     $("ticker-stocks").replaceChildren();
     $("spotlight").replaceChildren();
     for (const ticker of featuredSymbols) {
@@ -917,7 +930,7 @@
         connect();
       }
     }
-    if (spotlightSymbols.size < featuredSymbols.length && Date.now() - lastSpotlightAttempt >= 60000) loadSpotlight();
+    if ((!featuredSymbols.length || spotlightSymbols.size < featuredSymbols.length) && Date.now() - lastSpotlightAttempt >= 300000) loadSpotlight();
     updatePrices();
   }, 5000);
   document.addEventListener("visibilitychange", () => {
@@ -927,7 +940,7 @@
     }
   });
   window.addEventListener("online", () => {
-    if (spotlightSymbols.size < featuredSymbols.length) loadSpotlight();
+    if (!featuredSymbols.length || spotlightSymbols.size < featuredSymbols.length) loadSpotlight();
     else connect();
     refreshMarketStatus();
   });

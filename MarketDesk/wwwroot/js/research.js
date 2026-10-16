@@ -134,6 +134,116 @@
     link.href = "/stock/" + encodeURIComponent(symbol);
     return link;
   }
+  const svgNode = (tag, attributes = {}) => {
+    const n = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    Object.entries(attributes).forEach(([key, value]) => n.setAttribute(key, String(value)));
+    return n;
+  };
+  const quoteTime = timestamp => math.finite(timestamp) && timestamp > 0 && timestamp <= 253402300799
+    ? new Date(timestamp * 1000).toISOString().replace("T", " ").replace(".000Z", " UTC") : "Unavailable";
+  function quoteDetail(r) {
+    return `${r.symbol} · ${r.name || r.symbol} · Price ${fmt(r.price)} ${r.currency || ""} · Change ${fmt(r.changePercent)}% · Quote ${quoteTime(r.timestamp)}`;
+  }
+  // HTML labels remain readable on narrow screens; SVG bars share a zero baseline.
+  function bars(rows, label, unit, description) {
+    const figure = node("figure"), caption = node("figcaption", description);
+    figure.className = "data-figure bar-chart";
+    figure.setAttribute("aria-label", label);
+    figure.append(node("h2", label), caption);
+    const available = rows.filter(r => math.finite(r.value));
+    if (!available.length) {
+      figure.append(node("p", "No compatible values available for this chart."));
+    } else {
+      const scale = Math.max(...available.map(r => Math.abs(r.value)), 0.01);
+      const list = node("div");
+      list.className = "bar-list";
+      rows.forEach(r => {
+        const link = stockLink(r.symbol);
+        link.className = "data-bar";
+        link.title = r.detail;
+        link.setAttribute("aria-label", `${r.detail}; open stock details`);
+        const svg = svgNode("svg", { viewBox: "0 0 400 24", "aria-hidden": "true" });
+        svg.append(svgNode("line", { x1: 200, x2: 200, y1: 0, y2: 24 }));
+        const value = node("span", "Unavailable");
+        if (math.finite(r.value)) {
+          const width = Math.abs(r.value) / scale * 195;
+          svg.append(svgNode("rect", { x: r.value < 0 ? 200 - width : 200, y: 4, width, height: 16 }));
+          svg.classList.add(r.value < 0 ? "down" : "up");
+          value.replaceChildren(change(r.value), document.createTextNode(` ${unit}`));
+        }
+        link.replaceChildren(node("strong", r.symbol), svg, value);
+        list.append(link);
+      });
+      const detail = node("p", "Focus or hover a stock for quote details; select it to open its page.");
+      detail.className = "chart-detail caption";
+      list.addEventListener("focusin", e => { const row = e.target.closest(".data-bar"); if (row) detail.textContent = row.title; });
+      list.addEventListener("pointerover", e => { const row = e.target.closest(".data-bar"); if (row) detail.textContent = row.title; });
+      figure.append(list, detail);
+    }
+    results.append(figure);
+  }
+  function allocationChart(group, currency) {
+    const total = group.reduce((sum, h) => sum + h.value, 0);
+    if (!math.finite(total) || total <= 0) return;
+    const figure = node("figure"), layout = node("div"), legend = node("ol");
+    figure.className = "data-figure allocation-chart";
+    layout.className = "allocation-layout";
+    figure.append(node("h2", `Allocation · ${currency}`));
+    const svg = svgNode("svg", { viewBox: "0 0 240 240", role: "img", "aria-label": `Virtual holdings allocation in ${currency}; values and quote times in legend` });
+    const center = svgNode("text", { x: 120, y: 116, "text-anchor": "middle", class: "donut-total" });
+    center.textContent = fmt(total);
+    const sub = svgNode("text", { x: 120, y: 140, "text-anchor": "middle", class: "chart-axis-label" });
+    sub.textContent = currency;
+    let offset = 0;
+    group.forEach((h, i) => {
+      if (!math.finite(h.value) || h.value <= 0) return;
+      const share = h.value / total * 100;
+      const detail = `${h.symbol}: ${fmt(h.value)} ${currency} · ${fmt(share)}% · Quote ${quoteTime(h.timestamp)}`;
+      const circle = svgNode("circle", { cx: 120, cy: 120, r: 88, pathLength: 100, fill: "none", "stroke-width": 28,
+        "stroke-dasharray": `${share} ${100 - share}`, "stroke-dashoffset": -offset, transform: "rotate(-90 120 120)", class: `series-${i % 5}` });
+      const title = svgNode("title"); title.textContent = detail; circle.append(title); svg.append(circle);
+      const item = node("li"), link = stockLink(h.symbol);
+      link.className = `series-label-${i % 5}`;
+      item.append(link, node("strong", `${fmt(share)}%`), node("span", `${fmt(h.value)} ${currency}`), node("small", `Quote ${quoteTime(h.timestamp)}`));
+      legend.append(item);
+      offset += share;
+    });
+    svg.append(center, sub);
+    layout.append(svg, legend);
+    figure.append(layout, node("figcaption", "Latest available quote valuations of hypothetical holdings. Values may be stale; timestamps are shown per holding. No currency conversion."));
+    results.append(figure);
+  }
+  const earningsTiming = hour => ({ bmo: "Before market open", amc: "After market close", dmh: "During market hours" }[hour] || "Timing unspecified");
+  function earningsTimeline(rows) {
+    const dated = rows.filter(r => typeof r.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.date) && Number.isFinite(Date.parse(r.date)) && new Date(r.date).toISOString().slice(0, 10) === r.date);
+    if (!dated.length) return;
+    const figure = node("figure");
+    figure.className = "data-figure earnings-timeline";
+    figure.append(node("h2", "Announcement timeline"), node("figcaption", "Provider announcement dates, subject to change. Estimates and actuals are separate; currencies are unspecified by this endpoint."));
+    for (const date of new Set(dated.map(r => r.date))) {
+      const day = node("details"), heading = node("summary"), time = node("time", date), events = node("div");
+      const daily = dated.filter(r => r.date === date);
+      day.open = date === dated[0].date;
+      time.dateTime = date;
+      heading.append(time, node("span", `${daily.length} events`)); events.className = "earnings-events";
+      events.tabIndex = 0; events.setAttribute("aria-label", `Announcements on ${date}; scroll for more events`);
+      daily.forEach(r => {
+        const card = node("article"), title = node("h4");
+        title.append(stockLink(r.symbol));
+        card.append(title, node("p", earningsTiming(r.hour)), node("span", math.finite(r.epsActual) ? "EPS reported" : "EPS actual unavailable"));
+        const metrics = node("dl");
+        [["EPS estimate", r.epsEstimate], ["EPS actual", r.epsActual]].forEach(([label, value]) => {
+          const item = node("div"), amount = node("dd", fmt(value));
+          if (!math.finite(value)) amount.className = "missing-value";
+          item.append(node("dt", label), amount); metrics.append(item);
+        });
+        card.append(metrics); events.append(card);
+      });
+      day.append(heading, events); figure.append(day);
+    }
+    if (dated.length !== rows.length) figure.append(node("p", "Records without a valid announcement date appear only in the table."));
+    results.append(figure);
+  }
   function read(key, fallback) {
     try {
       return JSON.parse(localStorage.getItem(key)) ?? fallback;
@@ -197,6 +307,9 @@
         rows.filter((r) => r.currency === "USD"),
         values(),
       );
+      if (found.length) bars([...found].sort((a, b) => (math.finite(b.changePercent) ? b.changePercent : -Infinity) - (math.finite(a.changePercent) ? a.changePercent : -Infinity))
+        .map(r => ({ symbol: r.symbol, value: r.changePercent, detail: quoteDetail(r) })),
+        "Screened stocks · day change", "%", `${found.length} matching stocks. Ranked by change versus previous close; the table retains your chosen sort. Missing changes are not treated as zero. Quote timestamps may differ.`);
       if (!found.length)
         results.append(
           node("p", "No stocks match these filters. Try resetting them."),
@@ -364,6 +477,26 @@
       ),
       svg,
     );
+    const inspection = node("p");
+    inspection.className = "chart-detail caption";
+    const sliderLabel = node("label", "Inspect chart date"), slider = node("input");
+    slider.type = "range"; slider.min = "0"; slider.max = String(usable[0].points.length - 1); slider.value = "0";
+    sliderLabel.className = "chart-date-control";
+    sliderLabel.append(slider);
+    const inspect = index => {
+      const point = usable[0].points[index];
+      inspection.textContent = `${new Date(point.time).toLocaleDateString()} · ${usable.map(s => `${s.name}: ${fmt(s.points.find(p => p.time === point.time)?.value)}`).join(" · ")}`;
+    };
+    slider.oninput = () => inspect(Number(slider.value));
+    svg.addEventListener("pointermove", event => {
+      const box = svg.getBoundingClientRect();
+      const fraction = Math.max(0, Math.min(1, ((event.clientX - box.left) / box.width * 900 - 100) / 780));
+      const time = start + fraction * (end - start);
+      const index = usable[0].points.reduce((best, p, i, all) => Math.abs(p.time - time) < Math.abs(all[best].time - time) ? i : best, 0);
+      slider.value = String(index); inspect(index);
+    });
+    inspect(0);
+    results.append(sliderLabel, inspection);
     const legend = node("p");
     legend.className = "chart-legend";
     usable.forEach((s, i) => {
@@ -446,13 +579,16 @@
       const normalized = math.normalize(history);
       if (normalized.length)
         plot(normalized, "Normalized closing prices (base 100)");
-      else
+      else {
+        bars(rows.map((r, i) => ({ symbol: items[i], value: r.changePercent, detail: quoteDetail({ ...r, symbol: items[i] }) })),
+          "Selected stocks · day change", "%", "Latest available change versus each stock's previous close, in its own currency. This is a quote snapshot, not a historical return for the selected range. Quote timestamps may differ.");
         results.append(
           node(
             "p",
             "Historical comparison unavailable: Finnhub candle access is restricted, data is missing, or fewer than two common dates exist. No synthetic history is substituted.",
           ),
         );
+      }
       status.textContent = rows.some((r) => r.state !== "ok")
         ? "Comparison loaded with missing or limited provider fields. Retry after a minute if limited."
         : "Comparison loaded. Fundamentals are cached; quote times are shown per stock.";
@@ -625,23 +761,13 @@
           return;
         }
         const group = valuation.lots.filter((h) => h.currency === g.currency);
-        for (const symbol of new Set(group.map((h) => h.symbol))) {
-          const share =
-            (group
-              .filter((h) => h.symbol === symbol)
-              .reduce((sum, h) => sum + h.value, 0) /
-              g.value) *
-            100;
-          const label = node("label", `${symbol}: ${fmt(share)}% `),
-            meter = node("meter");
-          meter.min = 0;
-          meter.max = 100;
-          meter.value = share;
-          meter.setAttribute("aria-label", `${symbol} allocation`);
-          label.className = "allocation-row";
-          label.append(meter);
-          results.append(label);
-        }
+        const positions = [...new Set(group.map(h => h.symbol))].map(symbol => {
+          const lots = group.filter(h => h.symbol === symbol);
+          return { symbol, value: lots.reduce((sum, h) => sum + h.value, 0), profit: lots.reduce((sum, h) => sum + h.profit, 0), timestamp: lots[0].timestamp };
+        });
+        allocationChart(positions, g.currency);
+        bars(positions.map(h => ({ symbol: h.symbol, value: h.profit, detail: `${h.symbol} · Unrealized P/L ${fmt(h.profit)} ${g.currency} · Quote ${quoteTime(h.timestamp)}` })),
+          `Unrealized P/L · ${g.currency}`, g.currency, "Hypothetical purchase costs compared with latest available quote values. Not realized profit or historical performance; see quote times below.");
       });
     }
     async function load() {
@@ -781,6 +907,7 @@
               (scope.value !== "watch" || watch.includes(r.symbol)),
           )
           .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+        earningsTimeline(rows);
         table(
           [
             "Ticker",
