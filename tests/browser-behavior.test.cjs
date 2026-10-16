@@ -379,3 +379,28 @@ test("provider selection and universe count remain independent of partial quote 
   assert.equal(dom.requests.filter(url => url === "/api/universe").length, 1);
   dom.window.close();
 });
+
+test("fixed top ticker stays independent of daily spotlight and snapshot", async () => {
+  const dom = page({dashboard:true,selection:["ABC","XYZ"]}); await settle();
+  const d=dom.window.document;
+  assert.deepEqual([...d.querySelectorAll("#ticker-stocks [data-price-symbol]")].map(n=>n.dataset.priceSymbol),["AAPL","MSFT","AMZN","GOOGL","META","TSLA","V","NVDA"]);
+  assert.deepEqual([...d.querySelectorAll("#spotlight [data-price-symbol]")].map(n=>n.dataset.priceSymbol),["ABC","XYZ"]);
+  assert.deepEqual([...d.querySelectorAll(".pulse-row a")].map(n=>n.textContent),["ABC","XYZ"]);
+  assert.equal(d.getElementById("summary-quotes").textContent,"2 / 2");
+  const active=dom.streams.at(-1);
+  assert.equal(new Set(decodeURIComponent(active.url).split("symbols=")[1].split(",")).size,10);
+  active.onmessage({data:JSON.stringify({status:"connected",stocks:[{symbol:"V",price:300,changePercent:2,updatedAt:new Date().toISOString()}]})});
+  assert.equal(d.querySelector('#ticker-stocks [data-price-symbol="V"] .last').textContent,"300.00 USD");
+  assert.equal(d.getElementById("summary-quotes").textContent,"2 / 2");
+  assert.equal(dom.requests.filter(url=>url==="/api/data/stock/AAPL/quote").length,1);
+  dom.window.close();
+});
+
+test("top ticker remains available when the provider universe has no selection", async () => {
+  const dom=page({dashboard:true,selection:[]}); await settle();
+  assert.equal(dom.window.document.querySelectorAll("#ticker-stocks .ticker-stock").length,8);
+  assert.match(dom.window.document.querySelector("#ticker-stocks .last").textContent,/100.00/);
+  assert.equal(dom.window.document.querySelectorAll("#spotlight .spotlight-stock").length,0);
+  assert.match(dom.window.document.getElementById("spotlight").textContent,/No eligible provider symbols/);
+  dom.window.close();
+});

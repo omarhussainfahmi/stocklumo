@@ -232,12 +232,12 @@ public sealed class MarketTests
         await using var app = CreateApp();
         using var client = app.CreateClient();
         var store = app.Services.GetRequiredService<MarketStore>();
-        var symbols = Enumerable.Range(0, 28).Select(i => "TEST" + i).ToArray();
+        var symbols = Enumerable.Range(0, 38).Select(i => "TEST" + i).ToArray();
         foreach (var symbol in symbols) store.Ensure(symbol, symbol, "");
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        using var stream = await client.GetAsync("/api/market/stream?symbols=" + string.Join(',', symbols.Take(27)), HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+        using var stream = await client.GetAsync("/api/market/stream?symbols=" + string.Join(',', symbols.Take(37)), HttpCompletionOption.ResponseHeadersRead, timeout.Token);
         Assert.Equal(HttpStatusCode.OK, stream.StatusCode);
-        Assert.Equal(27, store.ActiveSymbols.Length);
+        Assert.Equal(37, store.ActiveSymbols.Length);
         using var rejected = await client.GetAsync("/api/market/stream?symbols=" + string.Join(',', symbols), timeout.Token);
         Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
         await timeout.CancelAsync();

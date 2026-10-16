@@ -50,8 +50,8 @@ public sealed class MarketController(MarketStore store) : Controller
     public async Task Stream(CancellationToken token, string? symbols = null)
     {
         var requested = symbols is null ? store.Symbols.Take(8).ToArray() : symbols.Split(',', StringSplitOptions.RemoveEmptyEntries).Distinct().ToArray();
-        // Twenty saved stocks, the selected stock and six shared ticker symbols.
-        if (requested.Length > 27 || requested.Any(s => !MarketDesk.Models.StockSymbol.IsValid(s))) { Response.StatusCode = 400; return; }
+        // Twenty saved stocks, one detail stock, eight spotlight and eight ticker symbols.
+        if (requested.Length > 37 || requested.Any(s => !MarketDesk.Models.StockSymbol.IsValid(s))) { Response.StatusCode = 400; return; }
         using var subscription = store.Subscribe(requested);
         if (subscription is null) { Response.StatusCode = 429; return; }
         Response.ContentType = "text/event-stream";

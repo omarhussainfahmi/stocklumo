@@ -8,6 +8,8 @@
   const verifiedSymbols = new Set();
   const history = [];
   const spotlightSymbols = new Set();
+  const tickerSymbols = ["AAPL", "MSFT", "AMZN", "GOOGL", "META", "TSLA", "V", "NVDA"];
+  const verifiedTickerSymbols = new Set();
   let featuredSymbols = [];
   let pulseSignature = "";
   let watch = readList("stocklumo.watch");
@@ -374,8 +376,9 @@
         ...(symbol && profile.ticker === symbol ? [symbol] : []),
         ...watch.filter((item) => verifiedSymbols.has(item)),
         ...spotlightSymbols,
+        ...verifiedTickerSymbols,
       ]),
-    ].slice(0, 27);
+    ].slice(0, 37);
     subscribedSymbols = symbols;
     if (!symbols.length) {
       connection(initializationError ? "error" : "idle", initializationError ? "ERROR" : "NO LIVE SUBSCRIPTIONS");
@@ -857,14 +860,22 @@
       featuredSymbols = Array.isArray(universe.selection) ? [...new Set(universe.selection.map(s => s.symbol).filter(validSymbol))].slice(0, 8) : [];
       if (!featuredSymbols.length) {
         $("spotlight").replaceChildren(element("p", universe.message || "No eligible provider symbols available.", "muted"));
-        $("ticker-stocks").replaceChildren(element("p", "Stock selection unavailable.", "caption"));
-        spotlightLoading = false;
-        return;
+
       }
     }
     $("ticker-stocks").replaceChildren();
-    $("spotlight").replaceChildren();
-    for (const ticker of featuredSymbols) {
+    if (featuredSymbols.length) $("spotlight").replaceChildren();
+    const tickerLinks = new Map();
+    for (const ticker of tickerSymbols) {
+      const link = element("a", undefined, "ticker-stock");
+      link.href = "/stock/" + ticker;
+      link.dataset.priceSymbol = ticker;
+      link.append(element("strong", ticker), element("span", "-", "last"), element("span", "-", "delta"), element("span", "Waiting for a price", "age"));
+      $("ticker-stocks").append(link);
+      tickerLinks.set(ticker, link);
+    }
+    // Shared quotes and subscriptions, but independent display selections and order.
+    for (const ticker of new Set([...featuredSymbols, ...tickerSymbols])) {
       const block = element("article", undefined, "spotlight-stock");
       block.dataset.priceSymbol = ticker;
       const heading = element("h3");
@@ -873,24 +884,21 @@
       heading.append(link);
       const name = element("p", "Loading company...", "muted");
       block.append(heading, name, element("strong", "-", "last"), element("p", "-", "delta"), element("p", "Waiting for a price", "age caption"));
-      const tickerLink = element("a", undefined, "ticker-stock");
-      tickerLink.href = "/stock/" + ticker;
-      tickerLink.dataset.priceSymbol = ticker;
-      tickerLink.append(element("strong", ticker), element("span", "-", "last"), element("span", "-", "delta"), element("span", "Waiting for a price", "age"));
-      $("ticker-stocks").append(tickerLink);
-      if (!$("overview").hidden) $("spotlight").append(block);
+      const tickerLink = tickerLinks.get(ticker);
+      if (!$("overview").hidden && featuredSymbols.includes(ticker)) $("spotlight").append(block);
       const result = await get("/api/data/stock/" + ticker + "/profile");
       if (result.state !== "ok" || result.data?.ticker !== ticker) {
         name.textContent = result.message || "Company information unavailable.";
         initializationError = true;
         if (!stream) { connection("error", "ERROR"); $("notice").textContent = name.textContent; }
         block.querySelector(".age").textContent = "Unavailable";
-        tickerLink.querySelector(".age").textContent = "Unavailable";
+        if (tickerLink) tickerLink.querySelector(".age").textContent = "Unavailable";
         continue;
       }
       name.textContent = result.data.name || ticker;
       prices.set(ticker, { ...prices.get(ticker), name: result.data.name, currency: result.data.currency, usMarket: isUsExchange(result.data) });
-      spotlightSymbols.add(ticker);
+      if (featuredSymbols.includes(ticker)) spotlightSymbols.add(ticker);
+      if (tickerSymbols.includes(ticker)) verifiedTickerSymbols.add(ticker);
       const resultQuote = await get("/api/data/stock/" + ticker + "/quote");
       quote(ticker, resultQuote.data);
       if (resultQuote.state !== "ok") prices.set(ticker, { ...prices.get(ticker), symbol: ticker, quoteState: resultQuote.state });
@@ -930,7 +938,7 @@
         connect();
       }
     }
-    if ((!featuredSymbols.length || spotlightSymbols.size < featuredSymbols.length) && Date.now() - lastSpotlightAttempt >= 300000) loadSpotlight();
+    if ((!featuredSymbols.length || spotlightSymbols.size < featuredSymbols.length || verifiedTickerSymbols.size < tickerSymbols.length) && Date.now() - lastSpotlightAttempt >= 300000) loadSpotlight();
     updatePrices();
   }, 5000);
   document.addEventListener("visibilitychange", () => {
@@ -940,7 +948,7 @@
     }
   });
   window.addEventListener("online", () => {
-    if (!featuredSymbols.length || spotlightSymbols.size < featuredSymbols.length) loadSpotlight();
+    if (!featuredSymbols.length || spotlightSymbols.size < featuredSymbols.length || verifiedTickerSymbols.size < tickerSymbols.length) loadSpotlight();
     else connect();
     refreshMarketStatus();
   });

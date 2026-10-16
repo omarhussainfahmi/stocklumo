@@ -9,7 +9,7 @@ Captured from the running application on 8 October 2026. Prices in the screensho
 ## Features
 
 - Dashboard, Markets, Watchlist and News routes, plus `/stock/AAPL` style company pages.
-- Daily eight-stock provider-selected ticker on every page, with timestamps and shared subscriptions. Twelve exploration links expand to twenty-four. The connection pulse respects reduced-motion settings.
+- Fixed eight-stock ticker (AAPL, MSFT, AMZN, GOOGL, META, TSLA, V, NVDA) on every page, separate from the daily provider-selected spotlight, with timestamps and shared subscriptions. Twelve exploration links expand to twenty-four. The connection pulse respects reduced-motion settings.
 - Debounced company/symbol lookup with cancellation and keyboard-accessible results.
 - Quote prices, previous-close changes, available daily statistics and company profiles.
 - Shared server-side WebSocket feed with subscription reference counts, unsubscribe, idle disconnect, reconnection, bounded messages and shutdown cancellation.
@@ -92,7 +92,7 @@ Backend tests cover price ordering, nullable calculations, payload parsing, subs
 - The key is sent in the REST authentication header. Finnhub requires the key in its WebSocket URL; exception messages and HTTP-client request logs are not emitted. Avoid enabling URI tracing in production.
 - Provider errors return safe messages. A 429 creates a 60-300 second shared cooldown; unauthorized access also backs off. No provider error body is sent to users.
 - REST usage is capped at 45 uncached requests per minute per process. Requests are serialized and identical requests share cached results. Cache accounting is bounded to approximately 16 MiB of payload/key text; response bodies are capped at 2 MiB and WebSocket messages at 256 KiB.
-- At most 40 distinct live symbols and 100 browser event streams are active per process. Each browser requests at most 27 symbols: twenty watchlist entries, the selected stock and six ticker stocks. Stored server stock entries are bounded to 256. These controls limit resources; they do not replace edge-level abuse protection.
+- At most 40 distinct live symbols and 100 browser event streams are active per process. Each browser requests at most 37 symbols: twenty watchlist entries, the selected stock, eight spotlight stocks and eight fixed ticker stocks. Stored server stock entries are bounded to 256. These controls limit resources; they do not replace edge-level abuse protection.
 - Quotes and news retain timestamps. Live-feed status and market-open status are distinct. Network silence marks the connection disconnected, and old price timestamps are labeled stale.
 - Production uses HTTPS redirection, HSTS, host filtering, safe exception responses and no permissive CORS policy. HTTPS port defaults to 443.
 
@@ -315,3 +315,5 @@ Provider references: [stock symbols](https://finnhub.io/docs/api/stock-symbols),
 Validation for this change: `dotnet build MarketDesk.slnx -c Release` succeeded with zero warnings/errors; `dotnet test MarketDesk.slnx -c Release --no-build` passed 77 tests; `npm test` passed 34 tests. Coverage includes universe filtering/size/selection stability, stale metadata caching, safe CDN redirects without credentials, quote freshness versus universe coverage, filtered chart datasets, normalized chart inspection, per-currency allocation, incomplete valuations and earnings empty/fiscal-period states. `git diff --check` and a configured-key source scan passed.
 
 Authenticated local verification returned 31,143 US metadata records and 4,977 eligible symbols on 16 October 2026. All eight selected symbols obtained quotes; stale observations were correctly labeled and no fresh trades were claimed during this check. The screener loaded 12 companies; its filter and chart agreed. Comparison returned genuine quote metrics but unavailable candle history, using the labeled snapshot fallback. Two temporary hypothetical portfolio holdings were valued with actual AAPL/MSFT quotes, their donut/P&L checked, and then removed. Earnings returned 1,498 records for the chosen range; grouped announcement cards, watchlist empty state and invalid date feedback were checked. Browser checks covered 390px, 768px and 1366px layouts, both themes and console errors. Existing live-feed reconnect warnings occurred locally; trade delivery is not claimed verified by these REST-based checks.
+
+The fixed top ticker and daily spotlight share cached quotes and one deduplicated subscription, while keeping their displayed selections separate. The per-browser subscription bound is 37 (20 watchlist, one detail, eight spotlight and eight ticker); the existing server-wide 40-symbol cap and REST request budget are unchanged.
