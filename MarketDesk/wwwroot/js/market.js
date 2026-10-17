@@ -389,7 +389,10 @@
         element("td", "Unavailable", "age"),
       );
       const actions = element("td");
-      const up = element("button", "↑");
+      const up = element("button");
+      const upIcon = element("span", "", "direction-icon direction-up");
+      upIcon.setAttribute("aria-hidden", "true");
+      up.append(upIcon);
       up.type = "button";
       up.disabled = index === 0;
       up.setAttribute("aria-label", `Move ${stockSymbol} up`);
@@ -737,7 +740,10 @@
     ]);
     const website = safeUrl(profile.weburl);
     if (website) {
-      const link = element("a", "Company website ↗");
+      const link = element("a", "Company website ");
+      const icon = element("span", "", "direction-icon direction-external");
+      icon.setAttribute("aria-hidden", "true");
+      link.append(icon);
       link.href = website;
       link.target = "_blank";
       link.rel = "noopener noreferrer";

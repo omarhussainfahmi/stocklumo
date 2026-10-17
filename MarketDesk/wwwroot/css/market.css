@@ -188,6 +188,15 @@ td button { font-size: 12px; padding: 6px 10px; margin: 2px; white-space: nowrap
 .tool-grid > a:hover { background: var(--accent); color: var(--ink); }
 .tool-grid h3 { display: flex; justify-content: space-between; gap: 8px; margin: 5px 0 12px; }
 .tool-grid h3 span { color: var(--green); }
+/* Draw arrows with CSS geometry so mobile emoji fonts cannot replace them. */
+.direction-icon { display: inline-block; position: relative; width: 1em; height: 1em; flex: 0 0 1em; vertical-align: -0.12em; }
+.direction-icon::before, .direction-icon::after { content: ""; position: absolute; box-sizing: border-box; }
+.direction-icon::before { width: 0.85em; height: 0; border-top: 1.5px solid currentColor; top: 50%; left: 0; }
+.direction-icon::after { width: 0.5em; height: 0.5em; border-top: 1.5px solid currentColor; border-right: 1.5px solid currentColor; top: 50%; right: 0.15em; transform: translateY(-50%) rotate(45deg); }
+.direction-external { transform: rotate(-45deg); }
+.direction-left { transform: rotate(180deg); }
+.direction-up { transform: rotate(-90deg); }
+
 .tool-grid p { font-size: 14px; color: var(--muted); margin: 0 0 16px; }
 .tool-action { margin-top: auto; font-size: 12px; color: var(--green); font-weight: 600; }
 .back { font: 12px var(--mono); display: inline-block; margin: 8px 0 24px; text-decoration: none; }

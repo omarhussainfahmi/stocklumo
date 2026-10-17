@@ -416,7 +416,9 @@
         inspector.append(head, quote, node("p", `Quote ${quoteTime(r.timestamp)}`));
         inspector.append(metricDefinitions([["Market cap (USD m)", fmt(r.marketCapMillions)], ["P/E TTM", fmt(r.peTtm)],
           ["Dividend yield TTM (%)", fmt(r.dividendYieldTtm)], ["10-day avg volume (m)", fmt(r.averageVolumeMillions)]]));
-        const open = stockLink(r.symbol); open.textContent = "Open stock details →"; open.className = "button-link"; inspector.append(open);
+        const open = stockLink(r.symbol); open.textContent = "Open stock details "; open.className = "button-link";
+        const arrow = node("span"); arrow.className = "direction-icon direction-right"; arrow.setAttribute("aria-hidden", "true");
+        open.append(arrow); inspector.append(open);
         distributionChart(found, inspected, ticker => inspect(ticker), inspector);
         list.querySelectorAll("button[data-inspect]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.inspect === ticker)));
         if (focus && window.matchMedia("(max-width: 850px)").matches) { title.focus({ preventScroll: true }); inspector.scrollIntoView({ block: "start" }); }
