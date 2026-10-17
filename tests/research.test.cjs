@@ -30,6 +30,10 @@ test("screener loads real response fields and supports reset and saved presets",
     12,
   );
   assert.equal(w.document.querySelectorAll(".data-bar").length, 12);
+  assert.equal(w.document.querySelector(".data-bar svg").getAttribute("preserveAspectRatio"), "none");
+  assert.match(w.document.getElementById("research-notes").textContent, /10-day average/);
+  assert.equal(w.document.querySelector("#research .data-notes").open, false);
+  assert.equal(w.document.querySelectorAll(".research-actions button").length, 4);
   assert.match(w.document.querySelector(".data-bar").title, /Quote .*UTC/);
   const input = w.document.querySelector("#research-controls input");
   input.value = "AAPL";
@@ -198,7 +202,7 @@ test("portfolio form saves a verified lot, calculates value, and removes it", as
   const inputs = w.document.querySelectorAll("#research-controls input");
   ["AAPL", "2", "10", "2020-01-01"].forEach((v, i) => (inputs[i].value = v));
   [...w.document.querySelectorAll("button")]
-    .find((b) => b.textContent === "Save hypothetical holding")
+    .find((b) => b.textContent === "Save holding")
     .click();
   await new Promise((r) => setTimeout(r, 20));
   assert.equal(

@@ -134,6 +134,13 @@ test("market snapshot uses existing quotes, a shared scale and honest unavailabl
   assert.equal(rows[1].querySelector("span").textContent, "+4.00%");
   assert.equal(Number(rows[1].querySelector("rect").getAttribute("width")), 2 * Number(rows[0].querySelector("rect").getAttribute("width")));
   assert.equal(rows[0].querySelector("a").getAttribute("href"), "/stock/AAPL");
+  assert.equal(rows[0].querySelector("svg").getAttribute("preserveAspectRatio"), "none");
+  assert.equal(rows[0].querySelector("rect").getAttribute("height"), "24");
+  const coverage = d.getElementById("universe-coverage");
+  assert.equal(coverage.hidden, false);
+  assert.equal(coverage.open, false);
+  assert.match(coverage.textContent, /2026-10-16 10:00:00 UTC/);
+  assert.match(coverage.textContent, /quote access varies/);
   assert.equal(dom.requests.length, count);
   dom.window.close();
   const missing = page({ dashboard: true, missing: true });

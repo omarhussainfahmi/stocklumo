@@ -21,7 +21,7 @@
   const isUsExchange = profile => typeof profile?.exchange === "string" && /^(NASDAQ|NEW YORK STOCK EXCHANGE|NYSE|NYSE ARCA|NYSE AMERICAN)(?:$|[ /,])/.test(profile.exchange);
   let subscribedSymbols = [];
   let transport = "connecting";
-  let streamMessage = "Establishing the connection. No fresh trade has been confirmed.";
+  let streamMessage = "Connecting. Waiting for fresh trades.";
   let marketCheckedAt = 0;
   let clockOffset = 0;
   const now = () => Date.now() + clockOffset;
@@ -51,21 +51,21 @@
     else if (transport === "connected") {
       if (failures.length) {
         state = "error"; text = "ERROR";
-        detail = "Quote refresh failed for " + failures.map(item => item.symbol).join(", ") + ". Retrying within the shared provider limit; retained prices keep their original timestamps.";
+        detail = "Quote refresh failed for " + failures.map(item => item.symbol).join(", ") + ". Retrying; last prices retained.";
       } else if (usOpen() === false) {
         state = "closed"; text = "MARKET CLOSED";
-        detail = "US market is outside regular trading hours. Prices may remain at the last close until Finnhub supplies new data. Extended-hours availability depends on provider access.";
+        detail = "US market is outside regular trading hours. Showing latest available prices.";
       } else if (items.some(item => freshness(item) === "live")) {
         state = "live"; text = "LIVE";
-        detail = "Fresh US trade data received. This applies only to stocks marked live; check each stock's timestamp.";
+        detail = "Fresh trades received for stocks marked live.";
       } else {
         state = "stale"; text = "STALE";
-        detail = usOpen() === null ? "Market hours could not be verified. No live-data claim can be made." : "No qualifying fresh trade received. REST quotes continue to refresh; old prices are retained honestly.";
+        detail = usOpen() === null ? "Market hours could not be verified. Check quote times." : "No fresh trades yet. Quotes are refreshing; check timestamps.";
       }
     }
     connection(state, text);
     $("connection").title = "Upstream connection: " + transport;
-    $("notice").textContent = detail + " Connection: " + transport + ". Data access may be limited or delayed; a connected socket is not proof of fresh prices.";
+    $("notice").textContent = detail + " Connection: " + transport + ".";
   }
   let lastEvent = Date.now();
   let lastStreamRecovery = 0;
@@ -131,7 +131,7 @@
       localStorage.setItem(key, JSON.stringify(value));
     } catch {
       $("storage-status").textContent =
-        "Browser storage is unavailable. Changes last only for this page session.";
+        "Storage unavailable. Changes last for this visit.";
     }
   }
   async function get(path, signal) {
@@ -146,7 +146,7 @@
           state: "error",
           message:
             response.status === 429
-              ? "Too many requests. Please try again in a minute."
+              ? "Request limit reached. Retry in a minute."
               : "This information could not be loaded.",
         };
       return await response.json();
@@ -154,7 +154,7 @@
       if (error.name === "AbortError") throw error;
       return {
         state: "error",
-        message: "Connection unavailable. Please retry shortly.",
+        message: "Connection unavailable. Retry shortly.",
       };
     }
   }
@@ -233,7 +233,7 @@
         : "Previous close unavailable",
     );
     $("data-age").textContent = item.updatedAt
-      ? `Price timestamp: ${stamp(item.updatedAt)} · ${age(item)}`
+      ? age(item)
       : "No price received";
     const stats = [
       ["Open", price(item.open)],
@@ -266,6 +266,10 @@
     const stocks = featuredSymbols.map(ticker => prices.get(ticker));
     $("summary-quotes").textContent = featuredSymbols.length ? `${stocks.filter(s => number(s?.price) && s.price > 0).length} / ${featuredSymbols.length}` : "-";
     $("summary-live").textContent = featuredSymbols.length ? String(stocks.filter(s => s && freshness(s) === "live").length) : "-";
+    if (!featuredSymbols.length) {
+      $("pulse-bars").replaceChildren(element("p", "No quotes available.", "muted"));
+      return;
+    }
     const signature = JSON.stringify(stocks.map(s => [s?.changePercent, s?.updatedAt]));
     if (signature === pulseSignature) return;
     pulseSignature = signature;
@@ -277,19 +281,20 @@
       const link = element("a", ticker);
       link.href = `/stock/${ticker}`;
       const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      svg.setAttribute("viewBox", "0 0 200 20");
+      svg.setAttribute("viewBox", "0 0 200 32");
+      svg.setAttribute("preserveAspectRatio", "none");
       svg.setAttribute("aria-hidden", "true");
       const axis = document.createElementNS(svg.namespaceURI, "line");
       axis.setAttribute("x1", "100"); axis.setAttribute("x2", "100");
-      axis.setAttribute("y1", "0"); axis.setAttribute("y2", "20");
+      axis.setAttribute("y1", "0"); axis.setAttribute("y2", "32");
       svg.append(axis);
       const label = element("span", "Unavailable");
       if (number(value)) {
         const bar = document.createElementNS(svg.namespaceURI, "rect");
         const width = Math.abs(value) / limit * 95;
         bar.setAttribute("x", String(value < 0 ? 100 - width : 100));
-        bar.setAttribute("y", "5"); bar.setAttribute("width", String(width));
-        bar.setAttribute("height", "10");
+        bar.setAttribute("y", "4"); bar.setAttribute("width", String(width));
+        bar.setAttribute("height", "24");
         svg.classList.add(value < 0 ? "down" : "up");
         svg.append(bar);
         movement(label, value, `${signed(value)}%`);
@@ -305,7 +310,7 @@
     $("watch-empty").hidden = watch.length > 0;
     $("watch-table").hidden = !watch.length;
     $("watch-count").textContent =
-      `${watch.length} / 20 · SAVED ON THIS DEVICE`;
+      `${watch.length} / 20 · SAVED HERE`;
     watch.forEach((stockSymbol, index) => {
       const row = element("tr");
       row.dataset.priceSymbol = stockSymbol;
@@ -355,7 +360,7 @@
     $("recent").replaceChildren();
     if (!recent.length)
       $("recent").append(
-        element("p", "Stocks you open will appear here.", "muted"),
+        element("p", "Stocks you open appear here.", "muted"),
       );
     for (const item of recent) {
       const link = element("a", item);
@@ -423,10 +428,10 @@
     stream.onerror = () => {
       if (!pageActive || stream !== currentStream) return;
       transport = "disconnected";
-      streamMessage = "Connection lost. Retrying automatically; displayed prices retain their original timestamps.";
+      streamMessage = "Connection lost. Retrying; last prices retained.";
       connection("disconnected", "DISCONNECTED");
       $("notice").textContent =
-        "Live connection lost. Reconnecting… Displayed prices may be stale.";
+        "Reconnecting. Prices may be stale.";
       // Re-register symbols if a server restart cleared its in-memory catalog.
       if (Date.now() - lastStreamRecovery >= 60000) {
         lastStreamRecovery = Date.now();
@@ -523,7 +528,7 @@
     );
     $("chart-status").textContent =
       chartRange === "session"
-        ? `${points.length} session observation${points.length === 1 ? "" : "s"}; historical data is separate.`
+        ? `${points.length} session observation${points.length === 1 ? "" : "s"}.`
         : `${chartRange} historical prices supplied by Finnhub.`;
   }
   function inspect(index) {
@@ -621,13 +626,13 @@
       $("company").textContent = symbol;
       $("company-status").textContent =
         result.message ||
-        "We couldn't find company information for that symbol.";
+        "Company unavailable for this symbol.";
       $("notice").textContent =
-        result.message || "We couldn't find that stock symbol.";
+        result.message || "Stock not found.";
       $("save-stock").disabled = true;
       $("change").textContent = "Price unavailable";
       $("chart-status").textContent =
-        "Price history is unavailable until this stock can be loaded.";
+        "Load the stock to view price history.";
       $("stock-news").textContent = "Company news is unavailable.";
       return;
     }
@@ -645,7 +650,7 @@
       .filter(Boolean)
       .join(" · ");
     $("currency").textContent = profile.currency || "";
-    $("company-status").textContent = "Company profile supplied by Finnhub.";
+    $("company-status").textContent = "Finnhub profile.";
     renderDefinitions($("company-info"), [
       ["Industry", profile.finnhubIndustry || "Unavailable"],
       ["Country", profile.country || "Unavailable"],
@@ -701,7 +706,7 @@
           button.hidden = true;
         });
       $("chart-status").textContent =
-        "Historical prices are unavailable with this data access. Session observations remain available.";
+        "History unavailable with this plan. Session view remains available.";
     }
   }
   $("save-stock").onclick = () => {
@@ -710,7 +715,7 @@
     else if (watch.length < 20) watch.push(symbol);
     else {
       $("storage-status").textContent =
-        "Your watchlist holds up to 20 stocks. Remove one to add another.";
+        "Watchlist full (20 stocks). Remove one first.";
       return;
     }
     save("stocklumo.watch", watch);
@@ -751,7 +756,7 @@
           result.state !== "ok"
             ? result.message
             : matches.length
-              ? `${matches.length} stock results. Tab to a result to open it.`
+              ? `${matches.length} results. Select a stock.`
               : "No stocks found.";
         for (const item of matches) {
           const li = element("li");
@@ -808,9 +813,9 @@
   $("intro-actions").hidden = page !== "/";
   $("toolkit").hidden = page !== "/";
   const introductions = {
-    "/watchlist": "The companies you follow, with current quote availability and timestamps. Saved on this browser.",
-    "/news": "Company developments and market reporting, with links to the original publishers.",
-    "/markets": "Explore selected US companies and their latest available movements. Start with a symbol, then look closer."
+    "/watchlist": "Your saved companies and latest quotes.",
+    "/news": "Market stories from the original publishers.",
+    "/markets": "Explore US companies and their latest moves."
   };
   if (introductions[page]) $("intro-description").textContent = introductions[page];
   if (symbol) {
@@ -852,11 +857,12 @@
     if (!featuredSymbols.length) {
       const universe = await get("/api/universe");
       if (!pageActive) { spotlightLoading = false; return; }
-      $("universe-note").hidden = $("workspace-summary").hidden;
+      $("universe-coverage").hidden = $("workspace-summary").hidden;
       $("summary-universe").textContent = Number.isInteger(universe.count) ? universe.count.toLocaleString() : "-";
       $("summary-exchanges").textContent = Number.isInteger(universe.exchanges) ? String(universe.exchanges) : "-";
-      const retrieved = universe.retrievedAt && Number.isFinite(Date.parse(universe.retrievedAt)) ? new Date(universe.retrievedAt).toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC") : "Unavailable";
-      $("universe-note").textContent = `Finnhub US symbol metadata: ${universe.state === "stale" ? "STALE cached" : "retrieved"} ${retrieved}. USD common stocks on Nasdaq, NYSE and NYSE American; excludes OTC, funds and other security types. Metadata refreshes every 24 hours and does not establish quote access. Market-wide advances/declines are unavailable without individual quotes across this universe. ${universe.message || ""}`;
+      const retrieved = universe.retrievedAt && Number.isFinite(Date.parse(universe.retrievedAt)) ? new Date(universe.retrievedAt).toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC") : null;
+      $("universe-coverage").querySelector("summary").textContent = universe.state === "stale" ? "Stock coverage (stale)" : "Stock coverage & updates";
+      $("universe-note").textContent = (retrieved ? `Finnhub coverage: ${universe.state === "stale" ? "STALE cache" : "updated"} ${retrieved}.` : "Finnhub coverage unavailable.") + (universe.message ? " " + universe.message : "");
       featuredSymbols = Array.isArray(universe.selection) ? [...new Set(universe.selection.map(s => s.symbol).filter(validSymbol))].slice(0, 8) : [];
       if (!featuredSymbols.length) {
         $("spotlight").replaceChildren(element("p", universe.message || "No eligible provider symbols available.", "muted"));
@@ -929,10 +935,10 @@
     if (!pageActive) return;
     if (stream && Date.now() - lastEvent > 15000) {
       transport = "disconnected";
-      streamMessage = "Connection lost. Retrying automatically; displayed prices retain their original timestamps.";
+      streamMessage = "Connection lost. Retrying; last prices retained.";
       connection("disconnected", "DISCONNECTED");
       $("notice").textContent =
-        "No recent connection heartbeat. Displayed prices may be stale.";
+        "No connection heartbeat. Prices may be stale.";
       if (Date.now() - lastStreamRecovery >= 60000) {
         lastStreamRecovery = Date.now();
         connect();

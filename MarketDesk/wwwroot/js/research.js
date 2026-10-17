@@ -21,6 +21,9 @@
   const controls = $("research-controls"),
     results = $("research-results"),
     status = $("research-status");
+  const actions = document.createElement("div");
+  actions.className = "research-actions";
+  controls.append(actions);
   const storageStatus = document.createElement("p");
   storageStatus.setAttribute("role", "status");
   controls.after(storageStatus);
@@ -39,13 +42,17 @@
     if (text != null) n.textContent = text;
     return n;
   };
+  function introduction(description, notes) {
+    $("research-description").textContent = description;
+    $("research-notes").textContent = notes;
+  }
   function field(label, type = "text", value = "") {
     const wrap = node("label", label),
       input = node("input");
     input.type = type;
     input.value = value;
     wrap.append(input);
-    controls.append(wrap);
+    controls.insertBefore(wrap, actions);
     return input;
   }
   function select(label, options) {
@@ -57,14 +64,14 @@
       input.append(option);
     });
     wrap.append(input);
-    controls.append(wrap);
+    controls.insertBefore(wrap, actions);
     return input;
   }
   function button(label, action) {
     const b = node("button", label);
     b.type = "button";
     b.onclick = action;
-    controls.append(b);
+    actions.append(b);
     return b;
   }
   const fmt = (value) =>
@@ -145,14 +152,14 @@
     return `${r.symbol} · ${r.name || r.symbol} · Price ${fmt(r.price)} ${r.currency || ""} · Change ${fmt(r.changePercent)}% · Quote ${quoteTime(r.timestamp)}`;
   }
   // HTML labels remain readable on narrow screens; SVG bars share a zero baseline.
-  function bars(rows, label, unit, description) {
+  function bars(rows, label, unit, description, destination = results) {
     const figure = node("figure"), caption = node("figcaption", description);
     figure.className = "data-figure bar-chart";
     figure.setAttribute("aria-label", label);
     figure.append(node("h2", label), caption);
     const available = rows.filter(r => math.finite(r.value));
     if (!available.length) {
-      figure.append(node("p", "No compatible values available for this chart."));
+      figure.append(node("p", "No comparable values available."));
     } else {
       const scale = Math.max(...available.map(r => Math.abs(r.value)), 0.01);
       const list = node("div");
@@ -162,27 +169,27 @@
         link.className = "data-bar";
         link.title = r.detail;
         link.setAttribute("aria-label", `${r.detail}; open stock details`);
-        const svg = svgNode("svg", { viewBox: "0 0 400 24", "aria-hidden": "true" });
-        svg.append(svgNode("line", { x1: 200, x2: 200, y1: 0, y2: 24 }));
+        const svg = svgNode("svg", { viewBox: "0 0 400 32", preserveAspectRatio: "none", "aria-hidden": "true" });
+        svg.append(svgNode("line", { x1: 200, x2: 200, y1: 0, y2: 32 }));
         const value = node("span", "Unavailable");
         if (math.finite(r.value)) {
           const width = Math.abs(r.value) / scale * 195;
-          svg.append(svgNode("rect", { x: r.value < 0 ? 200 - width : 200, y: 4, width, height: 16 }));
+          svg.append(svgNode("rect", { x: r.value < 0 ? 200 - width : 200, y: 4, width, height: 24 }));
           svg.classList.add(r.value < 0 ? "down" : "up");
           value.replaceChildren(change(r.value), document.createTextNode(` ${unit}`));
         }
         link.replaceChildren(node("strong", r.symbol), svg, value);
         list.append(link);
       });
-      const detail = node("p", "Focus or hover a stock for quote details; select it to open its page.");
+      const detail = node("p", "Hover or focus for quote details. Select to open.");
       detail.className = "chart-detail caption";
       list.addEventListener("focusin", e => { const row = e.target.closest(".data-bar"); if (row) detail.textContent = row.title; });
       list.addEventListener("pointerover", e => { const row = e.target.closest(".data-bar"); if (row) detail.textContent = row.title; });
       figure.append(list, detail);
     }
-    results.append(figure);
+    destination.append(figure);
   }
-  function allocationChart(group, currency) {
+  function allocationChart(group, currency, destination = results) {
     const total = group.reduce((sum, h) => sum + h.value, 0);
     if (!math.finite(total) || total <= 0) return;
     const figure = node("figure"), layout = node("div"), legend = node("ol");
@@ -210,8 +217,8 @@
     });
     svg.append(center, sub);
     layout.append(svg, legend);
-    figure.append(layout, node("figcaption", "Latest available quote valuations of hypothetical holdings. Values may be stale; timestamps are shown per holding. No currency conversion."));
-    results.append(figure);
+    figure.append(layout, node("figcaption", "Practice holdings at latest quotes. Check times; currencies stay separate."));
+    destination.append(figure);
   }
   const earningsTiming = hour => ({ bmo: "Before market open", amc: "After market close", dmh: "During market hours" }[hour] || "Timing unspecified");
   function earningsTimeline(rows) {
@@ -219,7 +226,7 @@
     if (!dated.length) return;
     const figure = node("figure");
     figure.className = "data-figure earnings-timeline";
-    figure.append(node("h2", "Announcement timeline"), node("figcaption", "Provider announcement dates, subject to change. Estimates and actuals are separate; currencies are unspecified by this endpoint."));
+    figure.append(node("h2", "Announcement timeline"), node("figcaption", "Announcement dates may change. Currency unspecified."));
     for (const date of new Set(dated.map(r => r.date))) {
       const day = node("details"), heading = node("summary"), time = node("time", date), events = node("div");
       const daily = dated.filter(r => r.date === date);
@@ -241,7 +248,7 @@
       });
       day.append(heading, events); figure.append(day);
     }
-    if (dated.length !== rows.length) figure.append(node("p", "Records without a valid announcement date appear only in the table."));
+    if (dated.length !== rows.length) figure.append(node("p", "Undated records appear in the table only."));
     results.append(figure);
   }
   function read(key, fallback) {
@@ -258,22 +265,22 @@
       return true;
     } catch {
       storageStatus.textContent =
-        "Browser storage unavailable. Changes are only kept for this visit.";
+        "Storage unavailable. Changes last for this visit.";
       return false;
     }
   }
   async function screener() {
     $("research-title").textContent = "Stock screener";
-    $("research-description").textContent =
-      "Screen 12 selected US companies, not the entire market. Prices use the listed currency; market cap is USD millions. Volume is the provider's 10-day average in millions of shares, not today's volume. Industry is Finnhub's classification. Missing values never pass numeric filters.";
+    introduction("Filter 12 selected US companies by price and fundamentals.",
+      "Prices are USD; market cap is USD millions. Volume is the 10-day average in millions of shares, not today's volume. Industry follows Finnhub. Missing values fail numeric filters; this is not a market-wide screen.");
     const filters = {
       query: field("Company or ticker"),
       industry: select("Industry", [["", "All industries"]]),
-      price: field("Minimum price (USD)", "number"),
-      changePercent: field("Minimum day change (%)", "number"),
-      marketCapMillions: field("Minimum market cap (USD millions)", "number"),
+      price: field("Min. price (USD)", "number"),
+      changePercent: field("Min. day change (%)", "number"),
+      marketCapMillions: field("Min. market cap (USD m)", "number"),
       averageVolumeMillions: field(
-        "Minimum 10-day average volume (millions)",
+        "Min. 10-day avg volume (m)",
         "number",
       ),
       sort: select("Sort by", [
@@ -309,10 +316,10 @@
       );
       if (found.length) bars([...found].sort((a, b) => (math.finite(b.changePercent) ? b.changePercent : -Infinity) - (math.finite(a.changePercent) ? a.changePercent : -Infinity))
         .map(r => ({ symbol: r.symbol, value: r.changePercent, detail: quoteDetail(r) })),
-        "Screened stocks · day change", "%", `${found.length} matching stocks. Ranked by change versus previous close; the table retains your chosen sort. Missing changes are not treated as zero. Quote timestamps may differ.`);
+        "Screened stocks · day change", "%", `${found.length} matches, ranked by day change. Table keeps your sort. Quote times vary.`);
       if (!found.length)
         results.append(
-          node("p", "No stocks match these filters. Try resetting them."),
+          node("p", "No matches. Try resetting filters."),
         );
       else
         table(
@@ -349,7 +356,7 @@
     });
     button("Save preset", () => {
       if (save("stocklumo.screener", values()))
-        status.textContent = "Filter preset saved on this device.";
+        status.textContent = "Preset saved.";
     });
     button("Load preset", () => {
       const saved = read("stocklumo.screener", null);
@@ -399,8 +406,8 @@
       );
       filters.industry.value = selected;
       status.textContent = failures
-        ? `${rows.length} companies loaded; ${failures} have unavailable or incomplete data. Retry after a minute if limited.`
-        : `${rows.length} companies loaded. Quotes cached for up to 60 seconds; fundamentals refresh hourly or less often.`;
+        ? `${rows.length} companies; ${failures} with missing data. Retry in a minute if limited.`
+        : `${rows.length} companies. Quotes cached 60s; fundamentals refresh less often.`;
       refresh.disabled = false;
       render();
     }
@@ -421,7 +428,7 @@
       items.some((s) => !/^[A-Z][A-Z0-9.-]{0,14}$/.test(s))
     )
       throw new Error(
-        `Enter ${min} to ${max} different stock tickers, separated by commas.`,
+        min === 1 && max === 1 ? "Enter one valid ticker." : `Enter ${min} to ${max} different stock tickers, separated by commas.`,
       );
     return items;
   }
@@ -524,11 +531,11 @@
   }
   async function compare() {
     $("research-title").textContent = "Compare stocks";
-    $("research-description").textContent =
-      "Compare 2-5 companies. Financial metrics use the same TTM definitions. Market capitalization is USD millions; stock prices retain their currencies. Charts align common provider dates and start at 100, showing price performance in each stock's currency, excluding dividends and FX returns.";
+    introduction("Compare 2-5 stocks, their fundamentals and price performance.",
+      "Metrics use trailing 12 months (TTM); market cap is USD millions. Prices keep their currencies. Historical charts share dates and start at 100, excluding dividends and currency conversion. Quote snapshots use each stock's previous close.");
     const input = field("Tickers (comma-separated)", "text", "AAPL, MSFT");
     input.maxLength = 80;
-    const range = select("Shared historical range", [
+    const range = select("Historical range", [
       ["1M", "1 month"],
       ["6M", "6 months"],
       ["1Y", "1 year"],
@@ -581,17 +588,17 @@
         plot(normalized, "Normalized closing prices (base 100)");
       else {
         bars(rows.map((r, i) => ({ symbol: items[i], value: r.changePercent, detail: quoteDetail({ ...r, symbol: items[i] }) })),
-          "Selected stocks · day change", "%", "Latest available change versus each stock's previous close, in its own currency. This is a quote snapshot, not a historical return for the selected range. Quote timestamps may differ.");
+          "Selected stocks · day change", "%", "Day change in each stock's currency, not a historical return. Quote times vary.");
         results.append(
           node(
             "p",
-            "Historical comparison unavailable: Finnhub candle access is restricted, data is missing, or fewer than two common dates exist. No synthetic history is substituted.",
+            "Historical comparison unavailable: insufficient shared dates or provider access.",
           ),
         );
       }
       status.textContent = rows.some((r) => r.state !== "ok")
-        ? "Comparison loaded with missing or limited provider fields. Retry after a minute if limited."
-        : "Comparison loaded. Fundamentals are cached; quote times are shown per stock.";
+        ? "Loaded with missing fields. Retry in a minute if limited."
+        : "Comparison loaded. Check each quote time.";
       setBusy(run, false);
     }
   }
@@ -599,11 +606,11 @@
   if (page === "/compare") compare();
   async function portfolio() {
     $("research-title").textContent = "Virtual portfolio";
-    $("research-description").textContent =
-      "Record hypothetical holdings only. No trades are placed. Values exclude fees, dividends, taxes, splits and FX conversions. Each currency has its own total. Saved only in this browser; clearing site data removes holdings. Up to 20 lots and 10 different stocks.";
+    introduction("Practice holdings. No real trades. Saved only in this browser.",
+      "Up to 20 lots across 10 stocks. Enter purchase prices in the stock's currency. Totals stay separate by currency; fees, dividends, taxes, splits and FX conversion are excluded. Clearing browser data removes holdings. Values use quote times, not purchase-date market prices.");
     const ticker = field("Ticker"),
       quantity = field("Quantity", "number"),
-      purchase = field("Purchase price (stock currency)", "number"),
+      purchase = field("Purchase price (per share)", "number"),
       date = field(
         "Purchase date",
         "date",
@@ -620,16 +627,16 @@
       editing = -1,
       busy = false,
       quotes = {};
-    const submit = button("Save hypothetical holding", add);
+    const submit = button("Save holding", add);
     button("Cancel edit", () => {
       editing = -1;
       ticker.value = "";
       quantity.value = "";
       purchase.value = "";
-      submit.textContent = "Save hypothetical holding";
+      submit.textContent = "Save holding";
     });
     const refresh = button("Refresh valuations", load);
-    const historical = button("Show historical P/L", history);
+    const historical = button("Historical P/L", history);
     async function add() {
       if (busy) return;
       let symbol;
@@ -648,7 +655,7 @@
       };
       if (!math.validHolding(h)) {
         status.textContent =
-          "Enter a positive quantity (up to 1 million), positive purchase price (up to 1 billion), and a valid past or current purchase date.";
+          "Quantity and price must be above zero (max. 1m shares and 1bn per share). Use today or an earlier date.";
         return;
       }
       const next = holdings.filter((_, i) => i !== editing);
@@ -669,7 +676,7 @@
       ) {
         status.textContent =
           response.message ||
-          "Cannot verify this stock's currency. Holding was not saved.";
+          "Currency unverified. Holding not saved.";
         busy = false;
         submit.disabled = false;
         return;
@@ -679,7 +686,7 @@
       holdings = next;
       editing = -1;
       save("stocklumo.portfolio", holdings);
-      submit.textContent = "Save hypothetical holding";
+      submit.textContent = "Save holding";
       busy = false;
       submit.disabled = false;
       await load();
@@ -688,7 +695,7 @@
       results.replaceChildren();
       const valuation = math.valueHoldings(holdings, quotes);
       if (!holdings.length) {
-        results.append(node("p", "No hypothetical holdings yet."));
+        results.append(node("p", "No practice holdings yet. Add your first above."));
         return;
       }
       table(
@@ -715,7 +722,7 @@
             quantity.value = h.quantity;
             purchase.value = h.purchasePrice;
             date.value = h.date;
-            submit.textContent = "Update hypothetical holding";
+            submit.textContent = "Update holding";
             ticker.focus();
           };
           remove.onclick = () => {
@@ -755,7 +762,7 @@
           results.append(
             node(
               "p",
-              "Total and allocation unavailable until every holding has a compatible quote dated on or after purchase.",
+              "Total and allocation unavailable: each holding needs a quote on or after purchase.",
             ),
           );
           return;
@@ -765,9 +772,12 @@
           const lots = group.filter(h => h.symbol === symbol);
           return { symbol, value: lots.reduce((sum, h) => sum + h.value, 0), profit: lots.reduce((sum, h) => sum + h.profit, 0), timestamp: lots[0].timestamp };
         });
-        allocationChart(positions, g.currency);
+        const visuals = node("div");
+        visuals.className = "portfolio-visuals";
+        results.append(visuals);
+        allocationChart(positions, g.currency, visuals);
         bars(positions.map(h => ({ symbol: h.symbol, value: h.profit, detail: `${h.symbol} · Unrealized P/L ${fmt(h.profit)} ${g.currency} · Quote ${quoteTime(h.timestamp)}` })),
-          `Unrealized P/L · ${g.currency}`, g.currency, "Hypothetical purchase costs compared with latest available quote values. Not realized profit or historical performance; see quote times below.");
+          `Unrealized P/L · ${g.currency}`, g.currency, "Practice costs vs latest quotes. Unrealized profit, not historical returns.", visuals);
       });
     }
     async function load() {
@@ -780,7 +790,7 @@
         quotes[symbol] = await get("/api/research/stock/" + symbol);
       render();
       status.textContent =
-        "Valuations use provider quote timestamps, not purchase-date prices. Refreshes every 60 seconds while this page is visible.";
+        "Latest quote valuations. Refreshes every 60s while visible.";
       busy = false;
       refresh.disabled = submit.disabled = historical.disabled = false;
     }
@@ -801,14 +811,14 @@
         results.append(
           node(
             "p",
-            "Historical closing-price P/L begins after all purchase dates, within the last year. Assumes these quantities were held continuously. It is not a time-weighted return or live valuation.",
+            "Closing-price P/L after all purchases, within one year. Assumes continuous holdings; not time-weighted or live.",
           ),
         );
       } else
         results.append(
           node(
             "p",
-            "Historical P/L unavailable: sufficient common closing prices after every purchase date are required. Current Finnhub candle access may be restricted.",
+            "Historical P/L unavailable: missing shared closes after purchase or restricted candle access.",
           ),
         );
       status.textContent = "Historical check complete.";
@@ -827,23 +837,23 @@
   if (page === "/portfolio") portfolio();
   function earnings() {
     $("research-title").textContent = "Earnings calendar";
-    $("research-description").textContent =
-      "Provider-reported dates and estimates can change. Actual results stay unavailable until reported. Fiscal period dates are not announcement dates. EPS is per share; revenue is in whole currency units. These endpoints do not specify currency, so values must not be compared or summed across companies.";
-    const ticker = field("Ticker (blank for calendar)");
+    introduction("Earnings dates, estimates and results. Dates may change.",
+      "Actuals appear when reported. Fiscal period ends are not announcement dates. EPS is per share; revenue is in whole units. Finnhub does not specify currency here: do not compare or sum amounts across companies.");
+    const ticker = field("Ticker (optional)");
     ticker.maxLength = 15;
     const mode = select("Display", [
       ["calendar", "Earnings calendar"],
-      ["reported", "Latest 4 reported quarters per stock"],
+      ["reported", "Last 4 reported quarters"],
     ]);
     const today = new Date(),
       end = new Date(today);
     end.setUTCDate(end.getUTCDate() + 30);
     const from = field(
-        "From (calendar)",
+        "From",
         "date",
         today.toISOString().slice(0, 10),
       ),
-      to = field("To (calendar)", "date", end.toISOString().slice(0, 10));
+      to = field("To", "date", end.toISOString().slice(0, 10));
     const scope = select("Filter", [
       ["all", "All / selected ticker"],
       ["watch", "My watchlist"],
@@ -964,13 +974,13 @@
           node(
             "p",
             errors.length
-              ? "Provider data could not be loaded. Retry when access is available."
+              ? "Provider data unavailable. Try again later."
               : "No earnings found for these filters.",
           ),
         );
       status.textContent = errors.length
         ? errors.join(" ")
-        : `${rows.length} records loaded. Provider data is cached for up to an hour.`;
+        : `${rows.length} records. Cached up to 1 hour.`;
       setBusy(run, false);
     });
   }
