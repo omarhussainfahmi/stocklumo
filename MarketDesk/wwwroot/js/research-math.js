@@ -2,6 +2,29 @@
 ((root) => {
   "use strict";
   const finite = (value) => typeof value === "number" && Number.isFinite(value);
+  function pricePosition(low, high, value) {
+    if (![low, high, value].every(v => finite(v) && v > 0) || high < low) return null;
+    return { fraction: high === low ? 0.5 : Math.max(0, Math.min(1, (value - low) / (high - low))),
+      outside: value < low || value > high, flat: high === low };
+  }
+  function breadth(stocks) {
+    const counts = { up: 0, down: 0, flat: 0, missing: 0 };
+    for (const stock of stocks) {
+      if (!finite(stock?.price) || stock.price <= 0 || !finite(stock.changePercent)) counts.missing++;
+      else counts[stock.changePercent > 0 ? "up" : stock.changePercent < 0 ? "down" : "flat"]++;
+    }
+    return counts;
+  }
+  function distribution(rows) {
+    const available = rows.filter(r => finite(r.marketCapMillions) && r.marketCapMillions > 0 && finite(r.changePercent));
+    if (!available.length) return null;
+    const minCap = Math.min(...available.map(r => r.marketCapMillions)), maxCap = Math.max(...available.map(r => r.marketCapMillions));
+    const minChange = Math.min(0, ...available.map(r => r.changePercent)), maxChange = Math.max(0, ...available.map(r => r.changePercent));
+    return { minCap, maxCap, minChange, maxChange,
+      points: available.map(r => ({ symbol: r.symbol,
+        x: minCap === maxCap ? 0.5 : (Math.log10(r.marketCapMillions) - Math.log10(minCap)) / (Math.log10(maxCap) - Math.log10(minCap)),
+        y: minChange === maxChange ? 0.5 : (r.changePercent - minChange) / (maxChange - minChange) })) };
+  }
   function screen(rows, filters) {
     const keys = [
       "price",
@@ -242,6 +265,9 @@
   }
   const api = {
     finite,
+    pricePosition,
+    breadth,
+    distribution,
     screen,
     candles,
     normalize,

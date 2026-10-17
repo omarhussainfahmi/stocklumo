@@ -73,6 +73,9 @@
   let chartRange = "session";
   let chartIndex = 0;
   let extraStats = [];
+  let annualRange = {};
+  let rangeSignature = "";
+  const balanceSignatures = new WeakMap();
   let searchAbort;
   let searchTimer;
   let chartVersion = 0;
@@ -206,6 +209,62 @@
       changePercent: q.pc > 0 ? ((current - q.pc) / q.pc) * 100 : null,
     });
   }
+  function svgElement(tag, attributes) {
+    const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    Object.entries(attributes).forEach(([name, value]) => node.setAttribute(name, value));
+    return node;
+  }
+  function renderBalance(container, stocks, label) {
+    container.hidden = !stocks.length;
+    if (!stocks.length) return;
+    const counts = window.StocklumoMath.breadth(stocks);
+    const signature = JSON.stringify(counts);
+    if (balanceSignatures.get(container) === signature) return;
+    balanceSignatures.set(container, signature);
+    const legend = element("div", undefined, "balance-legend");
+    legend.append(element("strong", label));
+    const svg = svgElement("svg", { viewBox: "0 0 400 8", preserveAspectRatio: "none", "aria-hidden": "true" });
+    let offset = 0;
+    for (const [key, text] of [["up", "up"], ["down", "down"], ["flat", "unchanged"], ["missing", "unavailable"]]) {
+      legend.append(element("span", `${counts[key]} ${text}`, `balance-${key}`));
+      if (counts[key]) {
+        const width = counts[key] / stocks.length * 400;
+        svg.append(svgElement("rect", { x: offset, y: 0, width, height: 8, class: `balance-${key}` }));
+        offset += width;
+      }
+    }
+    container.replaceChildren(legend, svg);
+  }
+  function renderPriceRanges(stock) {
+    const ranges = [["Day range", stock.low, stock.high], ["52-week range", annualRange.low, annualRange.high]];
+    const signature = JSON.stringify([stock.price, stock.updatedAt, ranges]);
+    if (signature === rangeSignature) return;
+    rangeSignature = signature;
+    $("price-ranges").replaceChildren();
+    for (const [label, low, high] of ranges) {
+      const panel = element("section", undefined, "range-card"), heading = element("h2", label);
+      panel.append(heading);
+      const position = window.StocklumoMath.pricePosition(low, high, stock.price);
+      if (!position) panel.append(element("p", "Range unavailable.", "muted"));
+      else {
+        const svg = svgElement("svg", { viewBox: "0 0 240 135", role: "img", "aria-label": `${label}: ${price(low)} to ${price(high)} ${profile.currency || ""}. Latest ${price(stock.price)}.${position.outside ? " Outside reported range." : ""}` });
+        const arc = "M20 115 A100 100 0 0 1 220 115";
+        svg.append(svgElement("path", { d: arc, class: "range-track" }),
+          svgElement("path", { d: arc, pathLength: 100, "stroke-dasharray": `${position.fraction * 100} 100`, class: "range-progress" }));
+        svg.append(svgElement("circle", { cx: 120 - Math.cos(position.fraction * Math.PI) * 100,
+          cy: 115 - Math.sin(position.fraction * Math.PI) * 100, r: 5, class: "range-marker" }));
+        const value = svgElement("text", { x: 120, y: 95, "text-anchor": "middle", class: "range-value" });
+        value.textContent = price(stock.price);
+        const sub = svgElement("text", { x: 120, y: 117, "text-anchor": "middle", class: "chart-axis-label" });
+        sub.textContent = profile.currency || "Price";
+        svg.append(value, sub);
+        const ends = element("div", undefined, "range-ends");
+        ends.append(element("span", price(low)), element("span", price(high)));
+        panel.append(svg, ends, element("p", position.outside ? "Latest price is outside this reported range." : position.flat ? "Provider reports a flat range." : "Latest quote within the reported range.", "caption"));
+      }
+      $("price-ranges").append(panel);
+    }
+  }
   function updatePrices() {
     document.querySelectorAll("[data-price-symbol]").forEach((row) => {
       const item = prices.get(row.dataset.priceSymbol);
@@ -221,9 +280,11 @@
     });
     renderFeedState();
     renderMarketPulse();
+    renderBalance($("watch-balance"), watch.map(ticker => prices.get(ticker)), "Saved stocks");
     if (!symbol) return;
     const item = prices.get(symbol);
     if (!item) return;
+    renderPriceRanges(item);
     $("price").textContent = price(item.price);
     movement(
       $("change"),
@@ -264,6 +325,7 @@
   function renderMarketPulse() {
     if ($("market-pulse").hidden) return;
     const stocks = featuredSymbols.map(ticker => prices.get(ticker));
+    renderBalance($("pulse-breadth"), stocks, "Selection balance");
     $("summary-quotes").textContent = featuredSymbols.length ? `${stocks.filter(s => number(s?.price) && s.price > 0).length} / ${featuredSymbols.length}` : "-";
     $("summary-live").textContent = featuredSymbols.length ? String(stocks.filter(s => s && freshness(s) === "live").length) : "-";
     if (!featuredSymbols.length) {
@@ -498,6 +560,8 @@
   function draw(points) {
     chartPoints = points;
     $("chart-line").setAttribute("d", "");
+    $("chart-area").setAttribute("d", "");
+    $("chart-point").setAttribute("hidden", "");
     $("cursor").setAttribute("hidden", "");
     if (!points.length) {
       $("chart-high").textContent = "-";
@@ -518,6 +582,13 @@
         )
         .join(" "),
     );
+    const path = $("chart-line").getAttribute("d");
+    const lastY = max === min ? 120 : 220 - ((points.at(-1).price - min) / range) * 200;
+    const lastX = points.length === 1 ? 15 : 885;
+    if (points.length > 1) $("chart-area").setAttribute("d", `${path} L885,235 L15,235 Z`);
+    $("chart-point").setAttribute("cx", lastX);
+    $("chart-point").setAttribute("cy", lastY);
+    $("chart-point").removeAttribute("hidden");
     $("chart-high").textContent = price(max);
     $("chart-low").textContent = price(min);
     $("chart-start").textContent = stamp(points[0].time);
@@ -686,6 +757,7 @@
     news($("stock-news"), await get(dataPath("news")));
     const metrics = await get(dataPath("metrics"));
     const metric = metrics.data?.metric;
+    annualRange = { low: metric?.["52WeekLow"], high: metric?.["52WeekHigh"] };
     extraStats = [
       ["52-week high", metric?.["52WeekHigh"]],
       ["52-week low", metric?.["52WeekLow"]],

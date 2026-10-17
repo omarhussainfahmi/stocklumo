@@ -211,7 +211,7 @@ test("portfolio form saves a verified lot, calculates value, and removes it", as
   );
   assert.deepEqual(
     [...w.document.querySelectorAll(".portfolio-metrics dd")].map(n => n.textContent),
-    ["20", "30", "+10"],
+    ["20", "30", "+10", "+50%"],
   );
   assert.equal(w.document.querySelectorAll(".allocation-chart circle").length, 1);
   assert.equal(w.document.querySelector(".allocation-chart circle").getAttribute("stroke-dasharray"), "100 0");
@@ -404,4 +404,54 @@ test("earnings empty ranges and fiscal quarters never produce announcement timel
   assert.ok(dates.every(input => !input.closest("label").hidden));
   assert.deepEqual(dates.map(input => input.value), originalDates);
   w.close();
+});
+
+
+test("range positions reject missing bounds and label values outside reported ranges", () => {
+  assert.equal(math.pricePosition(null, 20, 15), null);
+  assert.equal(math.pricePosition(20, 10, 15), null);
+  assert.equal(math.pricePosition(0, 20, 15), null);
+  assert.deepEqual(math.pricePosition(10, 20, 15), {fraction:0.5,outside:false,flat:false});
+  assert.deepEqual(math.pricePosition(10, 20, 30), {fraction:1,outside:true,flat:false});
+  assert.deepEqual(math.pricePosition(10, 10, 10), {fraction:0.5,outside:false,flat:true});
+});
+test("selection balance keeps missing prices and changes out of unchanged counts", () => {
+  assert.deepEqual(math.breadth([{price:10,changePercent:1},{price:10,changePercent:-1},{price:10,changePercent:0},{price:null,changePercent:0},undefined]),
+    {up:1,down:1,flat:1,missing:2});
+});
+test("distribution uses a logarithmic cap scale and excludes missing fields", () => {
+  const data = math.distribution([{symbol:"A",marketCapMillions:10,changePercent:-2},{symbol:"B",marketCapMillions:100,changePercent:0},{symbol:"C",marketCapMillions:1000,changePercent:2},{symbol:"D",marketCapMillions:0,changePercent:2},{symbol:"E",marketCapMillions:20,changePercent:null}]);
+  assert.deepEqual(data.points.map(p=>[p.symbol,p.x,p.y]),[["A",0,0],["B",0.5,0.5],["C",1,1]]);
+  assert.equal(math.distribution([{marketCapMillions:null,changePercent:0}]),null);
+  assert.deepEqual(math.distribution([{symbol:"A",marketCapMillions:10,changePercent:0}]).points,[{symbol:"A",x:0.5,y:0.5}]);
+});
+test("screener inspector and keyboard chart selection reuse loaded data and follow filters", async () => {
+  let requests=0;
+  const dom=await researchPage("screener", url=>{requests++;return {symbol:url.split("/").at(-1),name:url.split("/").at(-1)+" company",currency:"USD",price:20,changePercent:2,marketCapMillions:100,state:"ok"};});
+  const w=dom.window; w.matchMedia=()=>({matches:false});
+  const count=requests;
+  w.document.querySelector('button[data-inspect="MSFT"]').click();
+  assert.match(w.document.querySelector(".inspector-heading").textContent,/MSFT company/);
+  assert.equal(w.document.querySelector('button[data-inspect="MSFT"]').getAttribute("aria-pressed"),"true");
+  assert.equal(w.document.querySelectorAll(".distribution-point").length,12);
+  w.document.querySelector(".distribution-point").dispatchEvent(new w.KeyboardEvent("keydown",{key:"Enter"}));
+  assert.match(w.document.querySelector(".inspector-heading").textContent,/AAPL company/);
+  const input=w.document.querySelector("#research-controls input");input.value="MSFT";input.dispatchEvent(new w.Event("input"));
+  assert.equal(w.document.querySelectorAll("#research-results tbody tr").length,1);
+  assert.equal(w.document.querySelectorAll(".distribution-point").length,1);
+  assert.match(w.document.querySelector(".inspector-heading").textContent,/MSFT company/);
+  assert.equal(requests,count);w.close();
+});
+test("EPS graphics retain negative, zero and missing actuals without inventing bars", async () => {
+  const dom=await researchPage("earnings",()=>({state:"ok",data:{earningsCalendar:[
+    {symbol:"AAA",date:"2026-11-01",epsEstimate:-2,epsActual:-1},
+    {symbol:"BBB",date:"2026-11-01",epsEstimate:0,epsActual:null}]}}));
+  const w=dom.window;[...w.document.querySelectorAll("button")].find(b=>b.textContent==="Load earnings").click();
+  await new Promise(r=>setTimeout(r,25));
+  const cards=w.document.querySelectorAll(".earnings-events article");
+  const rects=cards[0].querySelectorAll(".eps-bars rect");
+  assert.equal(Number(rects[0].getAttribute("width")),2*Number(rects[1].getAttribute("width")));
+  assert.equal(cards[1].querySelectorAll(".eps-bars .eps-actual").length,0);
+  assert.equal(cards[1].querySelectorAll(".eps-bars circle").length,1);
+  assert.match(cards[1].textContent,/Unavailable/);w.close();
 });

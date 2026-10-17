@@ -105,7 +105,7 @@
       };
     }
   }
-  function table(headers, rows) {
+  function table(headers, rows, destination = results) {
     const wrap = node("div"),
       table = node("table"),
       head = node("thead"),
@@ -135,7 +135,8 @@
     });
     table.append(head, body);
     wrap.append(table);
-    results.append(wrap);
+    destination.append(wrap);
+    return wrap;
   }
   function change(value) {
     const label = node("span", math.finite(value) ? `${value > 0 ? "+" : ""}${fmt(value)}` : "Unavailable");
@@ -156,6 +157,85 @@
     ? new Date(timestamp * 1000).toISOString().replace("T", " ").replace(".000Z", " UTC") : "Unavailable";
   function quoteDetail(r) {
     return `${r.symbol} · ${r.name || r.symbol} · Price ${fmt(r.price)} ${r.currency || ""} · Change ${fmt(r.changePercent)}% · Quote ${quoteTime(r.timestamp)}`;
+  }
+  function metricDefinitions(entries) {
+    const list = node("dl"); list.className = "inspector-metrics";
+    entries.forEach(([label, value]) => {
+      const group = node("div"); group.append(node("dt", label), node("dd", value)); list.append(group);
+    });
+    return list;
+  }
+  function distributionChart(rows, selected, onSelect, destination) {
+    const data = math.distribution(rows), figure = node("figure");
+    figure.className = "data-figure distribution-chart";
+    figure.append(node("h2", "Size vs day change"));
+    if (!data) { figure.append(node("p", "Market cap and change unavailable.")); destination.append(figure); return; }
+    const svg = svgNode("svg", { viewBox: "0 0 400 250", role: "group", "aria-label": "Matching stocks: market cap on a logarithmic horizontal scale, day change on the vertical scale. Select a point to inspect." });
+    const y = value => data.maxChange === data.minChange ? 112 : 200 - (value - data.minChange) / (data.maxChange - data.minChange) * 175;
+    [data.minChange, (data.minChange + data.maxChange) / 2, data.maxChange].forEach(value => {
+      svg.append(svgNode("line", { x1: 58, x2: 376, y1: y(value), y2: y(value), class: "distribution-grid" }));
+      const text = svgNode("text", { x: 50, y: y(value) + 4, "text-anchor": "end", class: "chart-axis-label" }); text.textContent = `${fmt(value)}%`; svg.append(text);
+    });
+    svg.append(svgNode("line", { x1: 58, x2: 376, y1: y(0), y2: y(0), class: "distribution-zero" }));
+    [[data.minCap, 58, "start"], [data.maxCap, 376, "end"]].forEach(([value, x, anchor]) => {
+      const text = svgNode("text", { x, y: 228, "text-anchor": anchor, class: "chart-axis-label" }); text.textContent = fmt(value); svg.append(text);
+    });
+    data.points.forEach(point => {
+      const row = rows.find(r => r.symbol === point.symbol), group = svgNode("g", { role: "button", tabindex: 0,
+        "aria-label": `Inspect ${quoteDetail(row)}`, "aria-pressed": String(selected === row.symbol), class: "distribution-point" });
+      const title = svgNode("title"); title.textContent = `${row.symbol} · ${fmt(row.marketCapMillions)} USD m · ${fmt(row.changePercent)}%`;
+      group.append(title, svgNode("circle", { cx: 58 + point.x * 318, cy: 200 - point.y * 175, r: 6, class: row.changePercent < 0 ? "down" : "up" }));
+      group.onclick = () => onSelect(row.symbol);
+      group.onkeydown = event => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); onSelect(row.symbol); } };
+      svg.append(group);
+    });
+    figure.append(svg, node("figcaption", `${data.points.length} / ${rows.length} matches with data. Cap: USD m (log). Change: %. Select a point.`));
+    destination.append(figure);
+  }
+  function epsBars(estimate, actual, domain = [estimate, actual]) {
+    const svg = svgNode("svg", { viewBox: "0 0 240 44", preserveAspectRatio: "none", "aria-hidden": "true", class: "eps-bars" });
+    const values = domain.filter(math.finite), max = Math.max(0, ...values), min = Math.min(0, ...values), span = max - min || 1;
+    const x = v => 6 + (v - min) / span * 228;
+    svg.append(svgNode("line", { x1: x(0), x2: x(0), y1: 0, y2: 44, class: "distribution-zero" }));
+    [estimate, actual].forEach((value, index) => {
+      if (!math.finite(value)) return;
+      svg.append(svgNode("rect", { x: Math.min(x(0), x(value)), y: 4 + index * 20, width: Math.abs(x(value) - x(0)), height: 12, class: index ? "eps-actual" : "eps-estimate" }));
+      if (value === 0) svg.append(svgNode("circle", { cx: x(0), cy: 10 + index * 20, r: 2, class: index ? "eps-actual" : "eps-estimate" }));
+    });
+    return svg;
+  }
+  function comparisonMetrics(rows, symbols) {
+    const grid = node("div"); grid.className = "comparison-metrics";
+    for (const [key, label, unit] of [["marketCapMillions", "Market cap", "USD m"], ["peTtm", "P/E TTM", "x"], ["dividendYieldTtm", "Dividend yield TTM", "%"]]) {
+      const figure = node("figure"); figure.className = "data-figure metric-comparison";
+      figure.append(node("h2", label), node("figcaption", unit));
+      const values = rows.map(r => r[key]).filter(math.finite), min = Math.min(0, ...values), max = Math.max(0, ...values), span = max - min || 1;
+      const x = v => (v - min) / span * 200;
+      rows.forEach((r, i) => {
+        const line = node("div"), svg = svgNode("svg", { viewBox: "0 0 200 16", preserveAspectRatio: "none", "aria-hidden": "true" });
+        line.className = "metric-lane";
+        svg.append(svgNode("line", { x1: x(0), x2: x(0), y1: 0, y2: 16, class: "distribution-zero" }));
+        if (math.finite(r[key])) svg.append(svgNode("rect", { x: Math.min(x(0), x(r[key])), y: 3, width: Math.abs(x(r[key]) - x(0)), height: 10, class: "metric-fill" }));
+        line.append(stockLink(symbols[i]), svg, node("span", fmt(r[key]))); figure.append(line);
+      });
+      grid.append(figure);
+    }
+    results.append(grid);
+  }
+  function reportedEPS(rows) {
+    for (const symbol of new Set(rows.map(r => r.symbol))) {
+      const reports = rows.filter(r => r.symbol === symbol), figure = node("figure"), grid = node("div");
+      figure.className = "data-figure reported-eps"; grid.className = "reported-grid";
+      figure.append(node("h2", `${symbol} · EPS by fiscal quarter`), node("figcaption", "Quarter-end dates. Shared EPS scale within this stock; currency unspecified."));
+      const domain = reports.flatMap(r => [r.estimate, r.actual]);
+      for (const report of reports) {
+        const card = node("article");
+        card.append(node("h3", `Q${report.quarter ?? "-"} / ${report.year ?? "-"}`), node("p", `Period end: ${report.period || "Unavailable"}`), epsBars(report.estimate, report.actual, domain),
+          metricDefinitions([["EPS estimate", fmt(report.estimate)], ["EPS actual", fmt(report.actual)]]));
+        grid.append(card);
+      }
+      figure.append(grid); results.append(figure);
+    }
   }
   // HTML labels remain readable on narrow screens; SVG bars share a zero baseline.
   function bars(rows, label, unit, description, destination = results) {
@@ -232,7 +312,7 @@
     if (!dated.length) return;
     const figure = node("figure");
     figure.className = "data-figure earnings-timeline";
-    figure.append(node("h2", "Announcement timeline"), node("figcaption", "Announcement dates may change. Currency unspecified."));
+    figure.append(node("h2", "Announcement timeline"), node("figcaption", "EPS bars compare estimate and actual within each report. Dates may change; currency unspecified."));
     for (const date of new Set(dated.map(r => r.date))) {
       const day = node("details"), heading = node("summary"), time = node("time", date), events = node("div");
       const daily = dated.filter(r => r.date === date);
@@ -250,7 +330,7 @@
           if (!math.finite(value)) amount.className = "missing-value";
           item.append(node("dt", label), amount); metrics.append(item);
         });
-        card.append(metrics); events.append(card);
+        card.append(epsBars(r.epsEstimate, r.epsActual), metrics); events.append(card);
       });
       day.append(heading, events); figure.append(day);
     }
@@ -314,42 +394,50 @@
         desc: order.value === "desc",
       };
     }
+    let inspected = null;
     function render() {
       results.replaceChildren();
-      const found = math.screen(
-        rows.filter((r) => r.currency === "USD"),
-        values(),
-      );
-      if (found.length) bars([...found].sort((a, b) => (math.finite(b.changePercent) ? b.changePercent : -Infinity) - (math.finite(a.changePercent) ? a.changePercent : -Infinity))
+      const found = math.screen(rows.filter(r => r.currency === "USD"), values());
+      if (!found.length) { results.append(node("p", "No matches. Try resetting filters.")); return; }
+      if (!found.some(r => r.symbol === inspected)) inspected = found[0].symbol;
+      const workspace = node("div"), list = node("div"), inspector = node("aside");
+      workspace.className = "screener-workspace"; list.className = "screener-list";
+      inspector.className = "stock-inspector"; inspector.setAttribute("aria-label", "Company inspector");
+      workspace.append(list, inspector); results.append(workspace);
+      function inspect(ticker, focus = false) {
+        inspected = ticker;
+        const r = found.find(row => row.symbol === ticker);
+        inspector.replaceChildren();
+        const head = node("div"), title = node("h2", r.name || r.symbol), link = stockLink(r.symbol);
+        head.className = "inspector-heading"; title.tabIndex = -1;
+        head.append(node("p", "COMPANY INSPECTOR"), title, link, node("span", r.industry || "Industry unavailable"));
+        const quote = node("div"); quote.className = "inspector-quote";
+        quote.append(node("strong", math.finite(r.price) ? `${fmt(r.price)} ${r.currency}` : "Unavailable"), change(r.changePercent), node("span", "% vs previous close"));
+        inspector.append(head, quote, node("p", `Quote ${quoteTime(r.timestamp)}`));
+        inspector.append(metricDefinitions([["Market cap (USD m)", fmt(r.marketCapMillions)], ["P/E TTM", fmt(r.peTtm)],
+          ["Dividend yield TTM (%)", fmt(r.dividendYieldTtm)], ["10-day avg volume (m)", fmt(r.averageVolumeMillions)]]));
+        const open = stockLink(r.symbol); open.textContent = "Open stock details →"; open.className = "button-link"; inspector.append(open);
+        distributionChart(found, inspected, ticker => inspect(ticker), inspector);
+        list.querySelectorAll("button[data-inspect]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.inspect === ticker)));
+        if (focus && window.matchMedia("(max-width: 850px)").matches) { title.focus({ preventScroll: true }); inspector.scrollIntoView({ block: "start" }); }
+      }
+      table(["Company", "Price (USD)", "Day change (%)", "Industry", "Cap (USD m)", "10-day avg volume (m)", "Price timestamp"],
+        found.map(r => {
+          const company = node("div"), inspectButton = node("button", "Inspect");
+          company.className = "company-cell";
+          const name = node("small", r.name || r.symbol); name.title = r.name || r.symbol;
+          company.append(stockLink(r.symbol), name, inspectButton);
+          inspectButton.type = "button"; inspectButton.dataset.inspect = r.symbol;
+          inspectButton.setAttribute("aria-label", `Inspect ${r.symbol}`); inspectButton.onclick = () => inspect(r.symbol, true);
+          return [company, fmt(r.price), change(r.changePercent), r.industry || "Unavailable", fmt(r.marketCapMillions), fmt(r.averageVolumeMillions),
+            r.timestamp ? new Date(r.timestamp * 1000).toLocaleString() : "Unavailable"];
+        }), list);
+      const ranking = node("details"); ranking.className = "ranking-details";
+      ranking.append(node("summary", "Day-change ranking")); list.append(ranking);
+      bars([...found].sort((a, b) => (math.finite(b.changePercent) ? b.changePercent : -Infinity) - (math.finite(a.changePercent) ? a.changePercent : -Infinity))
         .map(r => ({ symbol: r.symbol, value: r.changePercent, detail: quoteDetail(r) })),
-        "Screened stocks · day change", "%", `${found.length} matches, ranked by day change. Table keeps your sort. Quote times vary.`);
-      if (!found.length)
-        results.append(
-          node("p", "No matches. Try resetting filters."),
-        );
-      else
-        table(
-          [
-            "Company",
-            "Price (USD)",
-            "Day change (%)",
-            "Industry",
-            "Cap (USD m)",
-            "10-day avg volume (m)",
-            "Price timestamp",
-          ],
-          found.map((r) => [
-            stockLink(r.symbol),
-            fmt(r.price),
-            change(r.changePercent),
-            r.industry || "Unavailable",
-            fmt(r.marketCapMillions),
-            fmt(r.averageVolumeMillions),
-            r.timestamp
-              ? new Date(r.timestamp * 1000).toLocaleString()
-              : "Unavailable",
-          ]),
-        );
+        "Screened stocks · day change", "%", `${found.length} matches, ranked by day change. Table keeps your sort. Quote times vary.`, ranking);
+      inspect(inspected);
     }
     Object.values(filters).forEach((f) => f.addEventListener("input", render));
     order.onchange = render;
@@ -589,6 +677,7 @@
             : r.message || "Unavailable",
         ]),
       );
+      comparisonMetrics(rows, items);
       const normalized = math.normalize(history);
       if (normalized.length)
         plot(normalized, "Normalized closing prices (base 100)");
@@ -757,9 +846,10 @@
       valuation.groups.forEach((g) => {
         const metrics = node("dl");
         metrics.className = "portfolio-metrics";
-        [["Cost basis", g.cost], ["Value", g.value], ["Unrealized P/L", g.profit]].forEach(([label, value]) => {
+        [["Cost basis", g.cost], ["Value", g.value], ["Unrealized P/L", g.profit], ["Unrealized return", math.finite(g.profit) && g.cost > 0 ? g.profit / g.cost * 100 : null]].forEach(([label, value]) => {
           const group = node("div"), amount = node("dd");
-          amount.append(label === "Unrealized P/L" ? change(value) : node("span", fmt(value)));
+          amount.append(label.startsWith("Unrealized") ? change(value) : node("span", fmt(value)));
+          if (label === "Unrealized return" && math.finite(value)) amount.append(document.createTextNode("%"));
           group.append(node("dt", label), amount);
           metrics.append(group);
         });
@@ -956,6 +1046,7 @@
           if (Array.isArray(r.data))
             rows.push(...r.data.filter((row) => row && row.symbol === symbol));
         }
+        reportedEPS(rows);
         table(
           [
             "Ticker",

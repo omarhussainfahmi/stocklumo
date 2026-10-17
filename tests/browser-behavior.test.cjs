@@ -13,6 +13,7 @@ function page({ missing = false, quoteWait, storedWatch = [], dashboard = false,
     runScripts: "outside-only",
   });
   const w = dom.window;
+  w.StocklumoMath = require("../MarketDesk/wwwroot/js/research-math.js");
   w.document.body.dataset.symbol = dashboard ? "" : "AAPL";
   w.matchMedia = () => ({ matches: false });
   dom.timers = [];
@@ -409,5 +410,16 @@ test("top ticker remains available when the provider universe has no selection",
   assert.match(dom.window.document.querySelector("#ticker-stocks .last").textContent,/100.00/);
   assert.equal(dom.window.document.querySelectorAll("#spotlight .spotlight-stock").length,0);
   assert.match(dom.window.document.getElementById("spotlight").textContent,/No eligible provider symbols/);
+  dom.window.close();
+});
+
+
+test("price chart shows a single observed point and real quote range without inventing history", async () => {
+  const dom=page(); await settle(); const d=dom.window.document;
+  assert.equal(d.getElementById("chart-point").hasAttribute("hidden"),false);
+  assert.equal(d.getElementById("chart-area").getAttribute("d"),"");
+  assert.equal(d.querySelectorAll(".range-card svg").length,1);
+  assert.match(d.querySelector(".range-card svg").getAttribute("aria-label"),/92.00 to 105.00/);
+  assert.match(d.querySelectorAll(".range-card")[1].textContent,/Range unavailable/);
   dom.window.close();
 });
