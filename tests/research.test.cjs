@@ -384,14 +384,24 @@ test("portfolio chart aggregates lots by stock, keeps currencies apart, and supp
 test("earnings empty ranges and fiscal quarters never produce announcement timelines", async () => {
   const dom=await researchPage("earnings",()=>({state:"ok",data:{earningsCalendar:[]}}));
   const w=dom.window,run=[...w.document.querySelectorAll("button")].find(b=>b.textContent==="Load earnings");
+  const dates = [...w.document.querySelectorAll('#research-controls input[type="date"]')];
+  const originalDates = dates.map(input => input.value);
+  assert.equal(dates.length, 2);
+  assert.ok(dates.every(input => input.closest("label").hidden === false));
   run.click();await new Promise(r=>setTimeout(r,20));
   assert.equal(w.document.querySelector(".earnings-timeline"),null);
   assert.match(w.document.querySelector("#research-results").textContent,/No earnings found/);
   w.document.querySelector("#research-controls input").value="AAA";
   w.document.querySelector("#research-controls select").value="reported";
+  w.document.querySelector("#research-controls select").dispatchEvent(new w.Event("change"));
+  assert.ok(dates.every(input => input.closest("label").hidden));
   w.fetch=async()=>({ok:true,json:async()=>({state:"ok",data:[{symbol:"AAA",period:"2026-09-30",actual:2}]})});
   run.click();await new Promise(r=>setTimeout(r,20));
   assert.equal(w.document.querySelector(".earnings-timeline"),null);
   assert.match(w.document.querySelector("#research-results").textContent,/Fiscal period end/);
+  w.document.querySelector("#research-controls select").value = "calendar";
+  w.document.querySelector("#research-controls select").dispatchEvent(new w.Event("change"));
+  assert.ok(dates.every(input => !input.closest("label").hidden));
+  assert.deepEqual(dates.map(input => input.value), originalDates);
   w.close();
 });

@@ -51,7 +51,13 @@
       input = node("input");
     input.type = type;
     input.value = value;
-    wrap.append(input);
+    if (type === "date") {
+      // iOS date controls add horizontal padding outside their assigned width.
+      const frame = node("span");
+      frame.className = "date-field";
+      frame.append(input);
+      wrap.append(frame);
+    } else wrap.append(input);
     controls.insertBefore(wrap, actions);
     return input;
   }
@@ -859,7 +865,7 @@
       ["watch", "My watchlist"],
     ]);
     mode.onchange = () => {
-      from.parentElement.hidden = to.parentElement.hidden =
+      from.closest("label").hidden = to.closest("label").hidden =
         mode.value === "reported";
     };
     const run = button("Load earnings", async () => {
