@@ -5,7 +5,7 @@ const { readFileSync } = require("node:fs");
 const { JSDOM } = require("jsdom");
 test("screener loads real response fields and supports reset and saved presets", async () => {
   const dom = new JSDOM(
-    readFileSync("MarketDesk/Views/Market/Index.cshtml", "utf8"),
+    require("./page-fixture.cjs")(),
     { url: "https://example.test/screener", runScripts: "outside-only" },
   );
   const w = dom.window;
@@ -178,7 +178,7 @@ test("historical portfolio P/L excludes dates before purchases", () => {
 });
 test("portfolio form saves a verified lot, calculates value, and removes it", async () => {
   const dom = new JSDOM(
-      readFileSync("MarketDesk/Views/Market/Index.cshtml", "utf8"),
+      require("./page-fixture.cjs")(),
       { url: "https://example.test/portfolio", runScripts: "outside-only" },
     ),
     w = dom.window;
@@ -252,7 +252,7 @@ test("MACD aligns signal and histogram after warm-up", () => {
 });
 test("disabled technical route has no navigation or controls and makes no research requests", () => {
   const dom = new JSDOM(
-    readFileSync("MarketDesk/Views/Market/Index.cshtml", "utf8"),
+    require("./page-fixture.cjs")(),
     { url: "https://example.test/technical", runScripts: "outside-only" },
   );
   const w = dom.window;
@@ -269,7 +269,7 @@ test("disabled technical route has no navigation or controls and makes no resear
 
 test("earnings filters the watchlist and preserves missing actuals instead of zero", async () => {
   const dom = new JSDOM(
-      readFileSync("MarketDesk/Views/Market/Index.cshtml", "utf8"),
+      require("./page-fixture.cjs")(),
       { url: "https://example.test/earnings", runScripts: "outside-only" },
     ),
     w = dom.window;
@@ -309,7 +309,7 @@ test("earnings filters the watchlist and preserves missing actuals instead of ze
 });
 
 test("comparison renders labeled shared-scale charts and keeps unavailable history explicit", async () => {
-  const dom = new JSDOM(readFileSync("MarketDesk/Views/Market/Index.cshtml", "utf8"), {
+  const dom = new JSDOM(require("./page-fixture.cjs")(), {
     url: "https://example.test/compare", runScripts: "outside-only",
   });
   const w = dom.window;
@@ -350,7 +350,7 @@ test("comparison renders labeled shared-scale charts and keeps unavailable histo
 });
 
 async function researchPage(path, response, holdings) {
-  const dom = new JSDOM(readFileSync("MarketDesk/Views/Market/Index.cshtml", "utf8"), { url: `https://example.test/${path}`, runScripts: "outside-only" });
+  const dom = new JSDOM(require("./page-fixture.cjs")(), { url: `https://example.test/${path}`, runScripts: "outside-only" });
   const w = dom.window;
   w.StocklumoMath = math; w.setInterval = () => 0;
   if (holdings) w.localStorage.setItem("stocklumo.portfolio", JSON.stringify(holdings));

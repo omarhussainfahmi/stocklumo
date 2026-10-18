@@ -4,24 +4,18 @@
 <!doctype html>
 <html lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Stocklumo: live stock tracking, watchlists and company information powered by Finnhub." />
-    <title>Stocklumo - @(symbol.Length > 0 ? symbol : ViewData["Title"] ?? "Market watch")</title>
-    <link asp-append-version="true" rel="icon" type="image/svg+xml" href="/images/stocklumo-icon.svg" />
-    <link asp-append-version="true" rel="stylesheet" href="/css/market.css" />
+    <partial name="_SiteHead" />
     <script asp-append-version="true" src="/js/research-math.js" defer></script>
     <script asp-append-version="true" src="/js/market.js" defer></script>
-    <script asp-append-version="true" src="/js/research.js" defer></script>
+    @if (new[] { "/screener", "/compare", "/portfolio", "/earnings" }.Contains(Context.Request.Path.Value))
+    {
+        <script asp-append-version="true" src="/js/research.js" defer></script>
+    }
 </head>
 <body data-symbol="@symbol">
 <a class="skip" href="#main">Skip to content</a>
 <section class="ticker" aria-label="Live stock prices"><div id="ticker-stocks" class="ticker-stocks" tabindex="0" aria-label="Stock prices. Scroll horizontally for more stocks."><p>Loading live stock prices...</p></div></section>
-<header class="header">
-    <a class="brand" href="/" aria-label="Stocklumo home"><img asp-append-version="true" src="/images/stocklumo-mark.svg" width="38" height="38" alt="" />Stocklumo</a>
-    <nav aria-label="Main navigation"><a href="/">Dashboard</a><a href="/markets">Markets</a><a href="/watchlist">Watchlist</a><a href="/news">News</a></nav>
-    <button id="theme" type="button">Dark mode</button>
-</header>
+<partial name="_SiteHeader" />
 <div class="market-strip"><span id="market-status">US market status unavailable</span><span id="connection" role="status">SETUP</span><span>DATA / FINNHUB</span></div>
 <main id="main" class="page">
     <nav class="research-nav" aria-label="Research tools"><a href="/screener">Stock screener</a><a href="/compare">Compare stocks</a><a href="/portfolio">Virtual portfolio</a><a href="/earnings">Earnings calendar</a></nav>
@@ -30,7 +24,7 @@
         <div class="intro-copy"><p class="eyebrow">YOUR MARKET DESK</p><h1 id="page-title">Follow the market.<br /><em>Find your perspective.</em></h1>
         <p id="intro-description" class="intro-description">Track prices. Explore companies. Follow what matters.</p>
         <div class="search"><label for="search">Find a stock</label><input id="search" type="search" maxlength="60" placeholder="Search a company or ticker symbol" autocomplete="off" aria-controls="search-results" /><p id="search-status" role="status"></p><ul id="search-results" aria-label="Search results" hidden></ul></div>
-        <div id="intro-actions" class="intro-actions" hidden><a class="button-link primary" href="/markets">Explore markets <span class="direction-icon direction-external" aria-hidden="true"></span></a><a class="button-link" href="/watchlist">Your watchlist <span class="direction-icon direction-right" aria-hidden="true"></span></a></div></div>
+        <div id="intro-actions" class="intro-actions"><a class="button-link primary" href="/markets">Explore markets <span class="direction-icon direction-external" aria-hidden="true"></span></a><a class="button-link" href="/watchlist">Your watchlist <span class="direction-icon direction-right" aria-hidden="true"></span></a></div></div>
         <aside id="market-pulse" class="market-pulse" hidden aria-labelledby="pulse-title"><div class="panel-heading"><span class="eyebrow">MARKET SNAPSHOT</span><span class="caption">vs previous close</span></div><h2 id="pulse-title">Selected stocks. One view.</h2><div id="pulse-breadth" class="selection-balance"></div><div id="pulse-bars" class="pulse-bars"><p class="muted">Waiting for quotes.</p></div><p class="caption">Selected stocks, not a market index. Shared % scale; timestamps below.</p></aside>
     </section>
     <dl id="workspace-summary" class="workspace-summary" hidden><div><dt><svg class="summary-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17V9m6 8V4m6 13v-6m6 6H1" /></svg>Stock coverage</dt><dd id="summary-universe">-</dd><span>US common stocks</span></div><div><dt><svg class="summary-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v14H3zM7 9h10M7 13h6" /></svg>Spotlight quotes</dt><dd id="summary-quotes">-</dd><span>Available / selected</span></div><div><dt><svg class="summary-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h5l3-8 4 16 3-8h5" /></svg>Live spotlight trades</dt><dd id="summary-live">-</dd><span>Fresh trades in this selection</span></div><div><dt><svg class="summary-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V5l8-3v19m0-14h10v14M6 8h2m-2 4h2m7-1h2m-2 4h2" /></svg>US exchanges</dt><dd id="summary-exchanges">-</dd><span>Nasdaq / NYSE / NYSE American</span></div><div><dt><svg class="summary-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4Z" /></svg>Saved stocks</dt><dd id="summary-watch">-</dd><a href="/watchlist">Open watchlist <span class="direction-icon direction-right" aria-hidden="true"></span></a></div><div><dt><svg class="summary-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6M3 3v6h6m3-3v6l4 2" /></svg>Recently viewed</dt><dd id="summary-recent">-</dd><span>In this browser</span></div></dl>
@@ -64,15 +58,8 @@
     <section id="news-section" class="section"><div class="section-title"><h2><span class="section-number" aria-hidden="true">06</span>Market news</h2><span>PUBLISHER REPORTS</span></div><div id="news"><p class="muted">Loading market news…</p></div></section>
     <noscript><p class="notice">Enable JavaScript for live prices, search, watchlists and charts.</p></noscript>
 </main>
-<footer class="footer">
-    <div class="footer-main">
-        <div class="footer-about"><a class="brand" href="/"><img asp-append-version="true" src="/images/stocklumo-mark.svg" width="32" height="32" alt="" />Stocklumo</a><p>Your personal market desk. Built by Omar Hussain Fahmi.</p></div>
-        <nav aria-label="Footer navigation"><h2>Explore</h2><a href="/">Dashboard</a><a href="/markets">Markets</a><a href="/watchlist">Watchlist</a><a href="/news">News</a></nav>
-        <div class="footer-contact"><h2>Get in touch</h2><a href="mailto:omarhussainfahmi@hotmail.com">omarhussainfahmi@hotmail.com</a><a class="contact-button" href="https://www.linkedin.com/in/omar-hussain-fahmi-830b62256" target="_blank" rel="noopener noreferrer">LinkedIn <span class="direction-icon direction-external" aria-hidden="true"></span></a></div>
-    </div>
-    <div class="footer-notes"><p>Market data by <a href="https://finnhub.io/" target="_blank" rel="noopener noreferrer">Finnhub <span class="direction-icon direction-external" aria-hidden="true"></span></a>. Coverage and delays vary. For information only, not investment advice.</p><p>Watchlist, recent stocks and settings stay in this browser.</p></div>
-    <div class="footer-bottom"><span>© @DateTime.UtcNow.Year Stocklumo</span><a href="#main">Back to top <span class="direction-icon direction-up" aria-hidden="true"></span></a></div>
-</footer>
+<a class="mobile-action" href="/markets">Explore markets<span class="direction-icon direction-right" aria-hidden="true"></span></a>
+<partial name="_SiteFooter" />
 </body>
 </html>
 

@@ -1,0 +1,7 @@
+@model int
+@{ Layout = "_InformationLayout"; }
+<section class="error-page"><p class="eyebrow">STOCKLUMO / @Model</p>
+<h1>@(Model == 404 ? "This page wasn't found." : "This page couldn't load.")</h1>
+<p>@(Model == 404 ? "The link may have changed. Your market desk is still here." : "Please try again shortly. Your saved browser data stays on this device.")</p>
+<a class="button-link primary" href="/">Open dashboard</a><a class="button-link" href="/markets">Explore markets</a>
+</section>

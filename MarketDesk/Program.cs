@@ -15,6 +15,11 @@ builder.Services.PostConfigure<Microsoft.AspNetCore.HostFiltering.HostFilteringO
 });
 builder.WebHost.ConfigureKestrel(o => o.AddServerHeader = false);
 builder.Services.AddControllersWithViews();
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.MimeTypes = ["text/css", "text/javascript", "application/javascript", "image/svg+xml"];
+});
 builder.Services.AddHttpsRedirection(options => options.HttpsPort = 443);
 builder.Services.AddSingleton<MarketStore>();
 builder.Services.AddSingleton<FinnhubApi>();
@@ -48,7 +53,7 @@ if (app.Configuration["RENDER"] == "true" && app.Environment.IsProduction())
 }
 app.Use(async (context, next) =>
 {
-    context.Response.Headers.ContentSecurityPolicy = "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+    context.Response.Headers.ContentSecurityPolicy = "default-src 'none'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; connect-src 'self' https://cloudflareinsights.com; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'";
     context.Response.Headers.XContentTypeOptions = "nosniff";
     context.Response.Headers.XFrameOptions = "DENY";
     context.Response.Headers["Referrer-Policy"] = "no-referrer";
@@ -61,7 +66,15 @@ app.UseExceptionHandler(error => error.Run(async context =>
     await context.Response.WriteAsJsonAsync(new { error = "Unable to complete the request." });
 }));
 if (!app.Environment.IsDevelopment()) { app.UseHsts(); app.UseHttpsRedirection(); }
-app.UseStaticFiles();
+app.UseStatusCodePagesWithReExecute("/site-error/{0}");
+// Compress public static assets only; keep streaming, API payloads and user pages out.
+app.UseWhen(context => context.Request.Path.StartsWithSegments("/css") || context.Request.Path.StartsWithSegments("/js") || context.Request.Path.StartsWithSegments("/images"),
+    assets => assets.UseResponseCompression());
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = context => context.Context.Response.Headers.CacheControl =
+        context.Context.Request.Query.ContainsKey("v") ? "public,max-age=31536000,immutable" : "public,max-age=3600"
+});
 app.UseRouting();
 app.UseRateLimiter();
 app.MapGet("/health", () => Results.Ok(new { status = "ok" })).RequireRateLimiting("read");

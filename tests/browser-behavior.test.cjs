@@ -2,7 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const { JSDOM } = require("jsdom");
-const html = readFileSync("MarketDesk/Views/Market/Index.cshtml", "utf8");
+const html = require("./page-fixture.cjs")();
 const script = readFileSync("MarketDesk/wwwroot/js/market.js", "utf8");
 const settle = () => new Promise((resolve) => setTimeout(resolve, 30));
 
@@ -75,6 +75,7 @@ function page({ missing = false, quoteWait, storedWatch = [], dashboard = false,
     else body = { state: "ok", data: { isOpen: marketOpen, session: marketOpen ? "regular" : "closed", t: Math.floor(w.Date.now() / 1000) } };
     return { ok: true, json: async () => body };
   };
+  w.eval(readFileSync("MarketDesk/wwwroot/js/site.js", "utf8"));
   w.eval(script);
   return dom;
 }

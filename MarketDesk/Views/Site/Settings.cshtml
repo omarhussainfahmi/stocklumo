@@ -1,0 +1,10 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{ Layout = "_InformationLayout"; }
+@section Scripts {
+<script asp-append-version="true" src="/js/research-math.js" defer></script>
+<script asp-append-version="true" src="/js/backups.js" defer></script>
+}
+<p class="eyebrow">STOCKLUMO / YOUR BROWSER</p><h1>Privacy &amp; backups</h1>
+<div class="settings-grid"><section class="settings-card"><h2>Optional analytics</h2><p id="analytics-choice" role="status">Analytics is off unless you allow it.</p><button type="button" data-privacy-open>Change privacy choice</button><p><a href="/privacy">Read the privacy policy</a></p></section>
+<section class="settings-card"><h2>Back up your data</h2><p>Download your watchlist, recent symbols, practice holdings, screener preset and theme. Keep this file private. It stays on your device and is never uploaded.</p><button type="button" id="backup-export">Download backup</button><p>Browser storage does not sync or back itself up. Download a fresh copy after important changes.</p></section>
+<section class="settings-card"><h2>Restore a backup</h2><p>Restore only a Stocklumo backup you trust. A preview appears before anything changes. Download your current data first: restoring replaces the saved categories in the file.</p><label for="backup-file">Stocklumo backup (.json, up to 128 KB)</label><input type="file" id="backup-file" accept=".json,application/json" aria-describedby="backup-status" /><p id="backup-preview"></p><button id="backup-restore" type="button" hidden>Replace saved data with this backup</button><p id="backup-status" role="status" tabindex="-1"></p></section></div>

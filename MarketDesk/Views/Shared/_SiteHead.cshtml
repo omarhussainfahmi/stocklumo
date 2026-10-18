@@ -1,0 +1,35 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@{
+    var meta = MarketDesk.Models.SitePage.ForPath(Context.Request.Path.Value ?? "/", Context.Response.StatusCode);
+    var title = meta.Title + " | Stocklumo";
+    var token = Configuration["Cloudflare:WebAnalyticsToken"] ?? "";
+    var analytics = System.Text.RegularExpressions.Regex.IsMatch(token, "\\A[a-f0-9]{32}\\z");
+}
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>@title</title>
+<meta name="description" content="@meta.Description" />
+@if (meta.NoIndex) { <meta name="robots" content="noindex, follow" /> }
+else { <link rel="canonical" href="@(MarketDesk.Models.SitePage.Origin + meta.Path)" /> }
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Stocklumo" />
+<meta property="og:title" content="@title" />
+<meta property="og:description" content="@meta.Description" />
+<meta property="og:url" content="@(MarketDesk.Models.SitePage.Origin + meta.Path)" />
+<meta property="og:image" content="@(MarketDesk.Models.SitePage.Origin)/images/stocklumo-share.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Stocklumo - your personal market desk. Track prices. Explore companies." />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="@title" />
+<meta name="twitter:description" content="@meta.Description" />
+<meta name="twitter:image" content="@(MarketDesk.Models.SitePage.Origin)/images/stocklumo-share.png" />
+<meta name="twitter:image:alt" content="Stocklumo - your personal market desk." />
+<meta name="theme-color" content="#0d202c" />
+@if (analytics) { <meta name="stocklumo-analytics" content="@token" /> }
+<link asp-append-version="true" rel="icon" type="image/svg+xml" href="/images/stocklumo-icon.svg" />
+<link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png" />
+<link asp-append-version="true" rel="stylesheet" href="/css/market.css" />
+<script asp-append-version="true" src="/js/site.js" defer></script>

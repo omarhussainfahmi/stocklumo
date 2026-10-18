@@ -861,28 +861,6 @@
       event.preventDefault();
     }
   });
-  let theme = "light";
-  try {
-    theme =
-      localStorage.getItem("stocklumo.theme") ||
-      (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-  } catch {}
-  function applyTheme() {
-    document.documentElement.dataset.theme = theme;
-    $("theme").textContent = theme === "dark" ? "Light mode" : "Dark mode";
-  }
-  applyTheme();
-  $("theme").onclick = () => {
-    theme = theme === "dark" ? "light" : "dark";
-    applyTheme();
-    try {
-      localStorage.setItem("stocklumo.theme", theme);
-    } catch {}
-  };
-  document.querySelectorAll("nav a").forEach((link) => {
-    if (link.getAttribute("href") === location.pathname)
-      link.setAttribute("aria-current", "page");
-  });
   const page = location.pathname;
   document.body.dataset.page = symbol ? "stock" : page === "/" ? "home" : page.slice(1);
   if (page === "/") document.querySelector(".intro").after($("market-pulse"));

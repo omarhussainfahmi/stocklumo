@@ -27,6 +27,18 @@
   const storageStatus = document.createElement("p");
   storageStatus.setAttribute("role", "status");
   controls.after(storageStatus);
+  controls.addEventListener("input", event => {
+    event.target.removeAttribute("aria-invalid");
+    status.classList.remove("validation-error");
+    status.setAttribute("role", "status");
+  });
+  function validationError(message, inputs) {
+    status.textContent = message;
+    status.classList.add("validation-error");
+    status.setAttribute("role", "alert");
+    inputs.forEach(input => input.setAttribute("aria-invalid", "true"));
+    inputs[0]?.focus();
+  }
   [
     "overview",
     "stock-detail",
@@ -51,6 +63,7 @@
       input = node("input");
     input.type = type;
     input.value = value;
+    input.setAttribute("aria-describedby", "research-status");
     if (type === "date") {
       // iOS date controls add horizontal padding outside their assigned width.
       const frame = node("span");
@@ -642,7 +655,7 @@
       try {
         items = symbols(input.value, 2, 5);
       } catch (e) {
-        status.textContent = e.message;
+        validationError(e.message, [input]);
         return;
       }
       setBusy(run, true);
@@ -740,7 +753,7 @@
       try {
         [symbol] = symbols(ticker.value, 1, 1);
       } catch (e) {
-        status.textContent = e.message;
+        validationError(e.message, [ticker]);
         return;
       }
       const h = {
@@ -751,8 +764,8 @@
         currency: "USD",
       };
       if (!math.validHolding(h)) {
-        status.textContent =
-          "Quantity and price must be above zero (max. 1m shares and 1bn per share). Use today or an earlier date.";
+        validationError("Quantity and price must be above zero (max. 1m shares and 1bn per share). Use today or an earlier date.",
+          [quantity, purchase, date].filter(input => input === quantity ? !(h.quantity > 0 && h.quantity <= 1000000) : input === purchase ? !(h.purchasePrice > 0 && h.purchasePrice <= 1000000000) : !h.date || h.date > date.max));
         return;
       }
       const next = holdings.filter((_, i) => i !== editing);
@@ -965,7 +978,7 @@
       try {
         if (ticker.value.trim()) [selected] = symbols(ticker.value, 1, 1);
       } catch (e) {
-        status.textContent = e.message;
+        validationError(e.message, [ticker]);
         return;
       }
       const saved = read("stocklumo.watch", []),
@@ -988,8 +1001,7 @@
         return;
       }
       if (mode.value === "reported" && !selected && scope.value !== "watch") {
-        status.textContent =
-          "Enter a ticker or choose My watchlist for reported results.";
+        validationError("Enter a ticker or choose My watchlist for reported results.", [ticker]);
         return;
       }
       setBusy(run, true);
