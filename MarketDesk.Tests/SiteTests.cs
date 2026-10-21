@@ -107,4 +107,23 @@ public sealed class SiteTests
         Assert.Empty(data.Content.Headers.ContentEncoding);
         Assert.True(data.Headers.CacheControl?.NoStore);
     }
+
+    [Fact]
+    public async Task ExhaustedPublicRequestBudgetReturnsSafeRetryGuidance()
+    {
+        await using var app = CreateApp(); using var client = app.CreateClient();
+        for (var i = 0; i < 300; i++)
+        {
+            using var allowed = await client.GetAsync("/health");
+            Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+        }
+        using var response = await client.GetAsync("/health");
+        Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
+        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
+        Assert.True(response.Headers.CacheControl?.NoStore);
+        Assert.NotNull(response.Headers.RetryAfter?.Delta);
+        Assert.InRange(response.Headers.RetryAfter!.Delta!.Value.TotalSeconds, 1, 60);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("retry", body); Assert.DoesNotContain("StackTrace", body);
+    }
 }

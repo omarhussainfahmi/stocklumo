@@ -359,6 +359,41 @@ async function researchPage(path, response, holdings) {
   await new Promise(r => setTimeout(r, 25));
   return dom;
 }
+
+test("large earnings results page every record and lazily expand announcement days without refetching", async () => {
+  // Synthetic provider-shaped records are test fixtures, never application data.
+  const rows = Array.from({length:1300}, (_, i) => ({symbol:`TEST${i}`,date:i < 650 ? "2026-11-01" : "2026-11-02",epsEstimate:1,epsActual:null}));
+  let requests = 0;
+  const dom = await researchPage("earnings", () => { requests++; return {state:"ok",data:{earningsCalendar:rows}}; });
+  const w = dom.window, d = w.document;
+  [...d.querySelectorAll("button")].find(b=>b.textContent === "Load earnings").click();
+  await new Promise(r=>setTimeout(r,30));
+  assert.equal(d.querySelectorAll("tbody tr").length,25);
+  assert.equal(d.querySelectorAll(".earnings-events article").length,25);
+  const days = d.querySelectorAll(".earnings-timeline details");
+  assert.equal(days[1].querySelectorAll("article").length,0);
+  days[1].open = true; await new Promise(r=>setTimeout(r,15));
+  assert.equal(days[1].querySelectorAll("article").length,25);
+  days[1].querySelector(".more-events").click();
+  assert.equal(days[1].querySelectorAll("article").length,50);
+  assert.equal(d.activeElement,days[1].querySelectorAll("h4")[25]);
+  days[1].open = false; await new Promise(r=>setTimeout(r,10));
+  days[1].open = true; await new Promise(r=>setTimeout(r,10));
+  assert.equal(days[1].querySelectorAll("article").length,50);
+  const pager = d.querySelector(".pagination"), buttons = pager.querySelectorAll("button"), size = pager.querySelector("select");
+  buttons[1].click(); assert.match(pager.textContent,/26-50 of 1300/);
+  assert.equal(d.activeElement,pager.querySelector('[role="status"]'));
+  buttons[0].click(); assert.match(pager.textContent,/1-25 of 1300/);
+  size.value = "100"; size.dispatchEvent(new w.Event("change"));
+  const reached = [];
+  do {
+    reached.push(...[...d.querySelectorAll("tbody tr td:first-child a")].map(a=>a.textContent));
+    if (buttons[1].disabled) break;
+    buttons[1].click();
+  } while (true);
+  assert.deepEqual(reached,rows.map(r=>r.symbol));
+  assert.equal(requests,1); w.close();
+});
 test("portfolio chart aggregates lots by stock, keeps currencies apart, and suppresses incomplete totals", async () => {
   const holdings = [
     {symbol:"AAA",currency:"USD",quantity:2,purchasePrice:10,date:"2020-01-01"},
@@ -433,9 +468,11 @@ test("screener inspector and keyboard chart selection reuse loaded data and foll
   w.document.querySelector('button[data-inspect="MSFT"]').click();
   assert.match(w.document.querySelector(".inspector-heading").textContent,/MSFT company/);
   assert.equal(w.document.querySelector('button[data-inspect="MSFT"]').getAttribute("aria-pressed"),"true");
+  assert.match(w.document.querySelector("tr.is-inspected").textContent, /MSFT/);
   assert.equal(w.document.querySelectorAll(".distribution-point").length,12);
   w.document.querySelector(".distribution-point").dispatchEvent(new w.KeyboardEvent("keydown",{key:"Enter"}));
   assert.match(w.document.querySelector(".inspector-heading").textContent,/AAPL company/);
+  assert.match(w.document.querySelector("tr.is-inspected").textContent, /AAPL/);
   const input=w.document.querySelector("#research-controls input");input.value="MSFT";input.dispatchEvent(new w.Event("input"));
   assert.equal(w.document.querySelectorAll("#research-results tbody tr").length,1);
   assert.equal(w.document.querySelectorAll(".distribution-point").length,1);

@@ -10,6 +10,28 @@ function site({ saved, blocked = false, token = "a".repeat(32) } = {}) {
   if (blocked) Object.defineProperty(w.navigator, "globalPrivacyControl", { value: true });
   w.eval(script); return dom;
 }
+
+test("compact navigation reaches research pages, closes safely and resets across breakpoints", () => {
+  const dom = new JSDOM(require("./page-fixture.cjs")(), {url:"https://example.test/screener",runScripts:"outside-only"});
+  const w = dom.window, d = w.document;
+  let resized;
+  const compact = {matches:true,addEventListener:(_,fn)=>{resized=fn;}};
+  w.matchMedia = query => query.includes("max-width") ? compact : {matches:false};
+  w.eval(script);
+  const header = d.querySelector(".header"), button = d.getElementById("navigation-toggle"), nav = d.getElementById("site-navigation");
+  assert.equal(button.hidden,false); assert.equal(button.getAttribute("aria-expanded"),"false");
+  assert.deepEqual([...nav.querySelectorAll(".mobile-research-link")].map(a=>a.getAttribute("href")),["/screener","/compare","/portfolio","/earnings"]);
+  assert.equal(nav.querySelector('[href="/screener"]').getAttribute("aria-current"),"page");
+  button.click(); assert.equal(d.activeElement,nav.querySelector("a"));
+  nav.dispatchEvent(new w.KeyboardEvent("keydown",{key:"Escape",bubbles:true}));
+  assert.equal(header.dataset.navOpen,"false"); assert.equal(d.activeElement,button);
+  button.click(); d.querySelector("main").dispatchEvent(new w.Event("pointerdown",{bubbles:true}));
+  assert.equal(header.dataset.navOpen,"false");
+  button.click(); compact.matches=false; resized();
+  assert.equal(button.hidden,true); assert.equal(header.dataset.navOpen,"false");
+  compact.matches=true; resized(); assert.equal(d.activeElement,button);
+  w.close();
+});
 test("analytics loads once only after explicit opt-in and can reopen preferences", () => {
   const dom = site(), w = dom.window, d = w.document;
   assert.equal(d.querySelector("#cloudflare-analytics"), null);

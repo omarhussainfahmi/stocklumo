@@ -36,6 +36,13 @@ builder.Services.AddHostedService<FinnhubFeed>();
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = 429;
+    o.OnRejected = async (context, token) =>
+    {
+        if (context.Lease.TryGetMetadata(System.Threading.RateLimiting.MetadataName.RetryAfter, out var retry))
+            context.HttpContext.Response.Headers.RetryAfter = Math.Max(1, Math.Ceiling(retry.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        context.HttpContext.Response.Headers.CacheControl = "no-store";
+        await context.HttpContext.Response.WriteAsJsonAsync(new { message = "Too many requests. Please retry shortly." }, token);
+    };
     o.AddConcurrencyLimiter("stream", p => { p.PermitLimit = 100; p.QueueLimit = 0; });
     o.AddFixedWindowLimiter("read", p =>
     {

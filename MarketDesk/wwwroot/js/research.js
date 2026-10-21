@@ -151,6 +151,28 @@
     destination.append(wrap);
     return wrap;
   }
+  function pagedTable(headers, rows, cells) {
+    if (rows.length <= 25) return table(headers, rows.map(cells));
+    const group = node("section"), viewport = node("div"), navigation = node("nav"), count = node("p");
+    group.className = "paged-results"; navigation.className = "pagination";
+    navigation.setAttribute("aria-label", "Earnings result pages");
+    count.className = "caption"; count.setAttribute("role", "status");
+    const previous = node("button", "Previous"), next = node("button", "Next"), label = node("label", "Rows per page "), size = node("select");
+    previous.type = next.type = "button";
+    [25, 50, 100].forEach(value => { const option = node("option", String(value)); option.value = String(value); size.append(option); });
+    label.append(size); navigation.append(count, label, previous, next); group.append(navigation, viewport); results.append(group);
+    let page = 0;
+    function render(focus = false) {
+      const limit = Number(size.value), pages = Math.ceil(rows.length / limit);
+      page = Math.max(0, Math.min(page, pages - 1));
+      viewport.replaceChildren(); table(headers, rows.slice(page * limit, (page + 1) * limit).map(cells), viewport);
+      count.textContent = `${page * limit + 1}-${Math.min((page + 1) * limit, rows.length)} of ${rows.length} records · Page ${page + 1} / ${pages}`;
+      previous.disabled = page === 0; next.disabled = page === pages - 1;
+      if (focus) { count.tabIndex = -1; count.focus({ preventScroll: true }); }
+    }
+    previous.onclick = () => { page--; render(true); }; next.onclick = () => { page++; render(true); };
+    size.onchange = () => { page = 0; render(); }; render();
+  }
   function change(value) {
     const label = node("span", math.finite(value) ? `${value > 0 ? "+" : ""}${fmt(value)}` : "Unavailable");
     if (math.finite(value)) label.className = value < 0 ? "down" : "up";
@@ -326,26 +348,42 @@
     const figure = node("figure");
     figure.className = "data-figure earnings-timeline";
     figure.append(node("h2", "Announcement timeline"), node("figcaption", "EPS bars compare estimate and actual within each report. Dates may change; currency unspecified."));
-    for (const date of new Set(dated.map(r => r.date))) {
+    const grouped = new Map();
+    dated.forEach(row => { if (!grouped.has(row.date)) grouped.set(row.date, []); grouped.get(row.date).push(row); });
+    for (const [date, daily] of grouped) {
       const day = node("details"), heading = node("summary"), time = node("time", date), events = node("div");
-      const daily = dated.filter(r => r.date === date);
       day.open = date === dated[0].date;
       time.dateTime = date;
       heading.append(time, node("span", `${daily.length} events`)); events.className = "earnings-events";
       events.tabIndex = 0; events.setAttribute("aria-label", `Announcements on ${date}; scroll for more events`);
-      daily.forEach(r => {
-        const card = node("article"), title = node("h4");
-        title.append(stockLink(r.symbol));
-        card.append(title, node("p", earningsTiming(r.hour)), node("span", math.finite(r.epsActual) ? "EPS reported" : "EPS actual unavailable"));
-        const metrics = node("dl");
-        [["EPS estimate", r.epsEstimate], ["EPS actual", r.epsActual]].forEach(([label, value]) => {
-          const item = node("div"), amount = node("dd", fmt(value));
-          if (!math.finite(value)) amount.className = "missing-value";
-          item.append(node("dt", label), amount); metrics.append(item);
+      let rendered = 0;
+      const more = node("button"); more.type = "button"; more.className = "more-events"; more.hidden = true;
+      function renderBatch(focus = false) {
+        if (!day.open || rendered >= daily.length) return;
+        let first;
+        const batch = daily.slice(rendered, rendered + 25);
+        batch.forEach(r => {
+          const card = node("article"), title = node("h4");
+          title.tabIndex = -1; first ??= title;
+          title.append(stockLink(r.symbol));
+          card.append(title, node("p", earningsTiming(r.hour)), node("span", math.finite(r.epsActual) ? "EPS reported" : "EPS actual unavailable"));
+          const metrics = node("dl");
+          [["EPS estimate", r.epsEstimate], ["EPS actual", r.epsActual]].forEach(([label, value]) => {
+            const item = node("div"), amount = node("dd", fmt(value));
+            if (!math.finite(value)) amount.className = "missing-value";
+            item.append(node("dt", label), amount); metrics.append(item);
+          });
+          card.append(epsBars(r.epsEstimate, r.epsActual), metrics); events.append(card);
         });
-        card.append(epsBars(r.epsEstimate, r.epsActual), metrics); events.append(card);
-      });
-      day.append(heading, events); figure.append(day);
+        rendered += batch.length;
+        more.hidden = rendered >= daily.length;
+        more.textContent = `Show ${Math.min(25, daily.length - rendered)} more of ${daily.length - rendered} remaining`;
+        if (focus) first?.focus({ preventScroll: true });
+      }
+      more.onclick = () => renderBatch(true);
+      day.append(heading, events, more); figure.append(day);
+      day.addEventListener("toggle", () => { if (!rendered) renderBatch(); });
+      if (day.open) renderBatch();
     }
     if (dated.length !== rows.length) figure.append(node("p", "Undated records appear in the table only."));
     results.append(figure);
@@ -433,7 +471,10 @@
         const arrow = node("span"); arrow.className = "direction-icon direction-right"; arrow.setAttribute("aria-hidden", "true");
         open.append(arrow); inspector.append(open);
         distributionChart(found, inspected, ticker => inspect(ticker), inspector);
-        list.querySelectorAll("button[data-inspect]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.inspect === ticker)));
+        list.querySelectorAll("button[data-inspect]").forEach(b => {
+          const active = b.dataset.inspect === ticker;
+          b.setAttribute("aria-pressed", String(active)); b.closest("tr").classList.toggle("is-inspected", active);
+        });
         if (focus && window.matchMedia("(max-width: 850px)").matches) { title.focus({ preventScroll: true }); inspector.scrollIntoView({ block: "start" }); }
       }
       table(["Company", "Price (USD)", "Day change (%)", "Industry", "Cap (USD m)", "10-day avg volume (m)", "Price timestamp"],
@@ -1028,7 +1069,7 @@
           )
           .sort((a, b) => String(a.date).localeCompare(String(b.date)));
         earningsTimeline(rows);
-        table(
+        pagedTable(
           [
             "Ticker",
             "Announcement date",
@@ -1038,7 +1079,7 @@
             "Revenue estimate",
             "Revenue actual",
           ],
-          rows.map((r) => [
+          rows, (r) => [
             stockLink(r.symbol),
             r.date || "Unavailable",
             {
@@ -1050,7 +1091,7 @@
             fmt(r.epsActual),
             fmt(r.revenueEstimate),
             fmt(r.revenueActual),
-          ]),
+          ],
         );
       } else {
         for (const symbol of selected ? [selected] : [...new Set(watch)]) {
@@ -1061,7 +1102,7 @@
             rows.push(...r.data.filter((row) => row && row.symbol === symbol));
         }
         reportedEPS(rows);
-        table(
+        pagedTable(
           [
             "Ticker",
             "Fiscal period end",
@@ -1070,14 +1111,14 @@
             "EPS actual",
             "Surprise (%)",
           ],
-          rows.map((r) => [
+          rows, (r) => [
             stockLink(r.symbol),
             r.period || "Unavailable",
             `${r.year ?? "-"} / ${r.quarter ?? "-"}`,
             fmt(r.estimate),
             fmt(r.actual),
             fmt(r.surprisePercent),
-          ]),
+          ],
         );
       }
       if (!rows.length)

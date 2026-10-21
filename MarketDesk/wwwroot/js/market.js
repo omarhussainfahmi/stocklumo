@@ -78,6 +78,7 @@
   const balanceSignatures = new WeakMap();
   let searchAbort;
   let searchTimer;
+  let searchDismissed = false;
   let chartVersion = 0;
   let marketOpen = null;
   let spotlightLoading = false;
@@ -800,7 +801,22 @@
     renderWatch();
     connect();
   };
+  function dismissSearch(returnFocus = false) {
+    searchDismissed = true;
+    clearTimeout(searchTimer);
+    searchAbort?.abort();
+    $("search-results").hidden = true;
+    $("search-status").textContent = "";
+    if (returnFocus) $("search").focus();
+  }
+  const searchBox = $("search").closest(".search");
+  searchBox.addEventListener("focusout", event => {
+    if (event.relatedTarget && !searchBox.contains(event.relatedTarget)) dismissSearch();
+  });
+  document.addEventListener("pointerdown", event => { if (!searchBox.contains(event.target)) dismissSearch(); });
+  $("search").setAttribute("aria-describedby", "search-status");
   $("search").addEventListener("input", () => {
+    searchDismissed = false;
     clearTimeout(searchTimer);
     searchAbort?.abort();
     $("search-results").replaceChildren();
@@ -819,7 +835,7 @@
           "/api/data/search?q=" + encodeURIComponent(query),
           signal,
         );
-        if (signal.aborted) return;
+        if (signal.aborted || searchDismissed) return;
         const matches =
           result.state === "ok" && Array.isArray(result.data?.result)
             ? result.data.result
@@ -853,11 +869,19 @@
   });
   $("search").addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
-      $("search-results").hidden = true;
-      searchAbort?.abort();
+      dismissSearch();
     }
     if (event.key === "ArrowDown") {
-      $("search-results").querySelector("a")?.focus();
+      if (!$("search-results").hidden) $("search-results").querySelector("a")?.focus();
+      event.preventDefault();
+    }
+  });
+  $("search-results").addEventListener("keydown", event => {
+    const links = [...$("search-results").querySelectorAll("a")], index = links.indexOf(document.activeElement);
+    if (event.key === "Escape") { dismissSearch(true); event.preventDefault(); }
+    else if (index >= 0 && ["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) {
+      if (event.key === "ArrowUp" && index === 0) $("search").focus();
+      else links[event.key === "Home" ? 0 : event.key === "End" ? links.length - 1 : Math.max(0, Math.min(links.length - 1, index + (event.key === "ArrowDown" ? 1 : -1)))]?.focus();
       event.preventDefault();
     }
   });

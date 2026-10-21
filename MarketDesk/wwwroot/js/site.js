@@ -16,6 +16,34 @@
     if (link.getAttribute("href") === location.pathname) link.setAttribute("aria-current", "page");
   });
   const header = document.querySelector(".header");
+  const navigation = document.getElementById("site-navigation"), navigationToggle = document.getElementById("navigation-toggle");
+  if (header && navigation && navigationToggle) {
+    const compact = matchMedia("(max-width: 600px)");
+    function closeNavigation(returnFocus = false) {
+      header.dataset.navOpen = "false"; navigationToggle.setAttribute("aria-expanded", "false");
+      if (returnFocus) navigationToggle.focus();
+    }
+    function resizeNavigation() {
+      navigationToggle.hidden = !compact.matches;
+      const focusedLink = navigation.contains(document.activeElement);
+      closeNavigation(compact.matches && focusedLink);
+    }
+    header.dataset.navReady = "true";
+    document.body.classList.add("navigation-ready");
+    navigationToggle.onclick = () => {
+      const open = header.dataset.navOpen !== "true";
+      header.dataset.navOpen = String(open); navigationToggle.setAttribute("aria-expanded", String(open));
+      if (open) navigation.querySelector("a")?.focus();
+    };
+    header.addEventListener("keydown", event => {
+      if (event.key === "Escape" && header.dataset.navOpen === "true") { closeNavigation(true); event.preventDefault(); }
+    });
+    header.addEventListener("focusout", event => { if (event.relatedTarget && !header.contains(event.relatedTarget)) closeNavigation(); });
+    document.addEventListener("pointerdown", event => { if (!header.contains(event.target)) closeNavigation(); });
+    navigation.addEventListener("click", event => { if (event.target.closest("a")) closeNavigation(); });
+    if (compact.addEventListener) compact.addEventListener("change", resizeNavigation);
+    resizeNavigation();
+  }
   if (header && typeof ResizeObserver !== "undefined") {
     new ResizeObserver(() => document.documentElement.style.setProperty("--header-offset", `${Math.ceil(header.getBoundingClientRect().height) + 16}px`)).observe(header);
   }
