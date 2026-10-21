@@ -378,7 +378,7 @@
         rendered += batch.length;
         more.hidden = rendered >= daily.length;
         more.textContent = `Show ${Math.min(25, daily.length - rendered)} more of ${daily.length - rendered} remaining`;
-        if (focus) first?.focus({ preventScroll: true });
+        if (focus) first?.focus();
       }
       more.onclick = () => renderBatch(true);
       day.append(heading, events, more); figure.append(day);

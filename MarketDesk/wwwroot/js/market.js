@@ -1042,7 +1042,7 @@
     pageActive = false;
     stream?.close();
     stream = undefined;
-    searchAbort?.abort();
+    dismissSearch();
   });
   window.addEventListener("pageshow", (event) => {
     if (event.persisted) location.reload();
