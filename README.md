@@ -1,5 +1,7 @@
 # Stocklumo
 
+Frontend update (22 October 2026): the approved Market Observatory direction introduces navy/mint and slate light themes, locally hosted Manrope typography, header search, a full-width stock chart, compact range displays and adjacent watchlist/company panels. Original logo assets, routes, provider behavior and browser-local data are preserved. Illustrative candles and indicators from the design reference are not substituted for unavailable provider data. See [DESIGN.md](DESIGN.md) and [design QA](design-qa.md) for the design rules, tests and limitations.
+
 Latest release (22 October 2026): commit `dccfb35` is deployed and verified on Render Free. All 100 backend tests, 55 frontend tests and 114 desktop/phone browser checks pass, and GitHub CI is green. Shared light-theme contrast, statistics semantics and loading stability were corrected. Server-side Sentry monitoring is enabled with sensitive event fields removed. Setup-event delivery was verified separately; no production exception was deliberately triggered. See the [quality review and Sentry configuration](docs/quality-review-2026-10-22.md) for deployment evidence, measurements and limitations. Earlier dated sections below describe historical releases.
 
 Stocklumo is an ASP.NET Core 10 MVC stock-tracking application powered by Finnhub. It combines an editorial financial interface with live prices, company pages, a browser-local watchlist and source-linked news.

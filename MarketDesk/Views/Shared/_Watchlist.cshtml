@@ -1,0 +1,8 @@
+@{ var onStock = !string.IsNullOrEmpty(ViewData["Symbol"] as string); }
+<section id="watch-section" class="section watch-panel">
+    <div class="section-title"><h2>Your watchlist</h2>@if (onStock) { <a class="panel-link" href="/watchlist">View all <span class="direction-icon direction-right" aria-hidden="true"></span></a> }<span id="watch-count">SAVED ON THIS DEVICE</span></div>
+    <p id="watch-empty" class="muted">No saved stocks. Search and add your first.</p>
+    <div id="watch-balance" class="selection-balance" hidden></div>
+    <div class="table-wrap"><table id="watch-table" hidden><caption class="sr-only">Saved stocks. Prices and changes come from Finnhub.</caption><thead><tr><th>Company</th><th>Last price</th><th>Day change</th><th>Data age</th><th>Manage</th></tr></thead><tbody id="watch-rows"></tbody></table></div>
+    <p id="storage-status" role="status" class="caption">Saved in this browser.</p>
+</section>

@@ -9,6 +9,17 @@
   const history = [];
   const spotlightSymbols = new Set();
   const tickerSymbols = ["AAPL", "MSFT", "AMZN", "GOOGL", "META", "TSLA", "V", "NVDA"];
+  // Local, licensed brand marks only; provider URLs never enter image attributes.
+  const companyMarks = { AAPL: "apple", MSFT: "microsoft", AMZN: "amazon", GOOGL: "google", META: "meta", NVDA: "nvidia" };
+  function companyMark(ticker, className) {
+    if (!Object.hasOwn(companyMarks, ticker)) return null;
+    const image = document.createElement("img");
+    image.src = `/images/icons/${companyMarks[ticker]}.svg`;
+    image.alt = "";
+    image.className = className;
+    image.width = image.height = 20;
+    return image;
+  }
   const verifiedTickerSymbols = new Set();
   let featuredSymbols = [];
   let pulseSignature = "";
@@ -72,7 +83,6 @@
   let chartPoints = [];
   let chartRange = "session";
   let chartIndex = 0;
-  let extraStats = [];
   let annualRange = {};
   let rangeSignature = "";
   const balanceSignatures = new WeakMap();
@@ -248,17 +258,11 @@
       const position = window.StocklumoMath.pricePosition(low, high, stock.price);
       if (!position) panel.append(element("p", "Range unavailable.", "muted"));
       else {
-        const svg = svgElement("svg", { viewBox: "0 0 240 135", role: "img", "aria-label": `${label}: ${price(low)} to ${price(high)} ${profile.currency || ""}. Latest ${price(stock.price)}.${position.outside ? " Outside reported range." : ""}` });
-        const arc = "M20 115 A100 100 0 0 1 220 115";
-        svg.append(svgElement("path", { d: arc, class: "range-track" }),
-          svgElement("path", { d: arc, pathLength: 100, "stroke-dasharray": `${position.fraction * 100} 100`, class: "range-progress" }));
-        svg.append(svgElement("circle", { cx: 120 - Math.cos(position.fraction * Math.PI) * 100,
-          cy: 115 - Math.sin(position.fraction * Math.PI) * 100, r: 5, class: "range-marker" }));
-        const value = svgElement("text", { x: 120, y: 95, "text-anchor": "middle", class: "range-value" });
-        value.textContent = price(stock.price);
-        const sub = svgElement("text", { x: 120, y: 117, "text-anchor": "middle", class: "chart-axis-label" });
-        sub.textContent = profile.currency || "Price";
-        svg.append(value, sub);
+        const svg = svgElement("svg", { viewBox: "0 0 240 24", preserveAspectRatio: "none", role: "img", "aria-label": `${label}: ${price(low)} to ${price(high)} ${profile.currency || ""}. Latest ${price(stock.price)}.${position.outside ? " Outside reported range." : ""}` });
+        const track = "M8 12 H232";
+        svg.append(svgElement("path", { d: track, class: "range-track" }),
+          svgElement("path", { d: track, pathLength: 100, "stroke-dasharray": `${position.fraction * 100} 100`, class: "range-progress" }),
+          svgElement("circle", { cx: 8 + position.fraction * 224, cy: 12, r: 5, class: "range-marker" }));
         const ends = element("div", undefined, "range-ends");
         ends.append(element("span", price(low)), element("span", price(high)));
         panel.append(svg, ends, element("p", position.outside ? "Latest price is outside this reported range." : position.flat ? "Provider reports a flat range." : "Latest quote within the reported range.", "caption"));
@@ -303,7 +307,7 @@
       ["Day low", price(item.low)],
       ["Previous close", price(item.previousClose)],
     ];
-    renderDefinitions($("stats"), [...stats, ...extraStats]);
+    renderDefinitions($("stats"), stats);
     const time = new Date(item.updatedAt).getTime();
     if (
       number(item.price) &&
@@ -380,6 +384,8 @@
       const company = element("td");
       const link = element("a", stockSymbol);
       link.href = `/stock/${stockSymbol}`;
+      const mark = companyMark(stockSymbol, "stock-mark");
+      if (mark) link.prepend(mark);
       company.append(link);
       const name = prices.get(stockSymbol)?.name;
       if (name) company.append(element("small", name));
@@ -563,6 +569,7 @@
   }
   function draw(points) {
     chartPoints = points;
+    $("chart").dataset.observations = String(points.length);
     $("chart-line").setAttribute("d", "");
     $("chart-area").setAttribute("d", "");
     $("chart-point").setAttribute("hidden", "");
@@ -720,6 +727,12 @@
       usMarket: isUsExchange(profile),
     });
     $("company").textContent = profile.name || symbol;
+    const mark = companyMark(symbol, "company-mark");
+    if (mark && $("company-mark")) {
+      mark.id = "company-mark";
+      mark.width = mark.height = 56;
+      $("company-mark").replaceWith(mark);
+    }
     $("symbol").textContent = symbol;
     $("exchange").textContent = [profile.exchange, profile.country]
       .filter(Boolean)
@@ -765,12 +778,6 @@
     const metrics = await get(dataPath("metrics"));
     const metric = metrics.data?.metric;
     annualRange = { low: metric?.["52WeekLow"], high: metric?.["52WeekHigh"] };
-    extraStats = [
-      ["52-week high", metric?.["52WeekHigh"]],
-      ["52-week low", metric?.["52WeekLow"]],
-    ]
-      .filter(([, value]) => number(value) && value > 0)
-      .map(([name, value]) => [name, price(value)]);
     updatePrices();
     const candles = await get(dataPath("chart") + "?range=1M");
     document
