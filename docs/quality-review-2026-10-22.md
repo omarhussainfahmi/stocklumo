@@ -34,7 +34,11 @@ Actual iPhone hardware, assistive-technology user testing and field Core Web Vit
 
 The GitHub connector can read `omarhussainfahmi/stocklumo`, but its connected account (`MHZ48`) reports `pull: true`, `push: false`. This review did not change permissions or connect a different GitHub account. The collaborator-permission endpoint returned 403 for the integration.
 
-Read-only production checks returned HTTP 200 for `/health`, `/robots.txt` and `/sitemap.xml`. They verify the existing deployment only. No changes from this review have been pushed or deployed.
+Existing Windows Git credentials successfully pushed commit `dccfb355dd13bb1e371f3390b491b5ef5dfd67a0` to the owner's repository without changing connector permissions. [GitHub Actions run 39707414390](https://github.com/omarhussainfahmi/stocklumo/actions/runs/39707414390) passed, including the backend, frontend, browser and dependency checks.
+
+After the owner confirmed Omarhussain's workspace, Render automatically deployed this commit to the existing Free service. Deployment `dep-dbcmktukvk2s73e2n4i0` became live at 01:45:48 UTC on 22 October 2026. No paid service or duplicate manual deployment was created.
+
+Production checks returned HTTP 200 for `/health`, `/`, `/markets`, `/watchlist`, `/stock/AAPL`, `/screener`, `/compare`, `/portfolio`, `/earnings`, `/news`, `/privacy`, `/terms`, `/settings`, `/robots.txt`, `/sitemap.xml` and the social-preview image. `/technical` correctly returned 404. Served HTML/CSS contain the updated layout, accent and privacy disclosure. The browser loaded actual Finnhub quotes and search results and correctly reported MARKET CLOSED with separate connection health. Fresh trades were not observed outside regular trading hours. The checked post-deployment Render error logs were empty. These checks do not replace physical-phone testing or establish production loading-time guarantees.
 
 ## Optional Sentry monitoring
 
@@ -45,11 +49,11 @@ The owner created the `stocklumo` Sentry organization using EU storage. The ASP.
 - `Sentry__Enabled=true`
 - `Sentry__Dsn` from the project's Client Keys settings.
 
-For local development, the DSN is saved in the existing ASP.NET User Secrets store; it is not in source control. Enable monitoring explicitly with `Sentry__Enabled=true` for an intended local run. The normal app and browser tests leave monitoring off. On Render, add these variables through its secret configuration when deploying the tested code; do not paste the DSN into browser scripts or commit credentials.
+For local development, the DSN is saved in the existing ASP.NET User Secrets store; it is not in source control. Enable monitoring explicitly with `Sentry__Enabled=true` for an intended local run. The normal app and browser tests leave monitoring off. Both variables are now saved in Render's server-side environment, preserving all existing settings, and the enabled configuration has been deployed. Do not paste the DSN into browser scripts or commit credentials.
 
 `ErrorMonitoring.SafeEvent` reconstructs reports from a small allowlist: exception type, software version, environment and event time. It omits original exception messages/stacks, request URLs/query strings/headers/bodies, user fields, arbitrary contexts, extras and breadcrumbs. This deliberately limits diagnostic detail to protect provider keys and user input. Provider-handled failures and HTTP 4xx responses are not automatically escalated to application exceptions. Sentry still processes the reporting server's network connection and provider-side retention rules apply.
 
-Two backend tests verify that original sensitive fields are not copied. A single intentional setup event passed through this same filter and was visibly received in Sentry as `DOTNET-ASPNETCORE-1`, environment `setup-verification`, tag `verification=setup-2026-10-22`. It is a delivery check, not an actual production failure. Production monitoring is not active until the code and configuration are deployed. The Sentry CLI/account integration is separate from the application SDK and was not authenticated in this review.
+Two backend tests verify that original sensitive fields are not copied. A single intentional setup event passed through this same filter and was visibly received in Sentry as `DOTNET-ASPNETCORE-1`, environment `setup-verification`, tag `verification=setup-2026-10-22`. It is a local delivery check, not an actual production failure. Production monitoring is now enabled and the application starts healthily, but no production exception was deliberately triggered or newly received production event verified. The Sentry CLI/account integration is separate from the application SDK and was not authenticated in this review.
 
 ## Repeat verification
 
