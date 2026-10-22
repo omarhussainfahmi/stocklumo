@@ -1,5 +1,7 @@
 # Stocklumo
 
+Latest local review (22 October 2026): 100 backend tests, 55 frontend tests and 114 desktop/phone browser checks pass. Shared light-theme contrast, statistics semantics and loading stability were corrected. Browser checks now run in CI. Optional, explicitly enabled server-side Sentry monitoring strips sensitive event fields; its setup delivery was verified, but production monitoring and these changes are **not deployed**. See the [quality review and Sentry configuration](docs/quality-review-2026-10-22.md) for measurements, setup and limitations. Earlier dated sections below describe historical releases.
+
 Stocklumo is an ASP.NET Core 10 MVC stock-tracking application powered by Finnhub. It combines an editorial financial interface with live prices, company pages, a browser-local watchlist and source-linked news.
 
 ![Stocklumo displaying actual Finnhub trades and a session chart](docs/stocklumo-desktop.png)
@@ -32,7 +34,7 @@ The app never substitutes invented prices, news or company profiles. Starter com
 
 ## Stack and structure
 
-C#, ASP.NET Core 10 MVC, Razor, HTML, CSS, plain JavaScript, xUnit and ASP.NET Core TestHost. Node and jsdom are used **only for frontend tests**, not to run the website.
+C#, ASP.NET Core 10 MVC, Razor, HTML, CSS, plain JavaScript, xUnit and ASP.NET Core TestHost. Node, jsdom, Playwright and axe are used **only for frontend tests**, not to run the website. The optional server-side Sentry integration sends minimal error reports only when explicitly enabled.
 
 - `MarketDesk/Program.cs` registers services and configures middleware, security headers, HTTPS and rate limits.
 - `MarketDesk/Controllers/MarketController.cs` serves pages and the browser event stream.
@@ -68,11 +70,15 @@ Get a key from https://finnhub.io/. Never paste the real key into Git, JavaScrip
 dotnet test MarketDesk.slnx -c Release
 npm ci --ignore-scripts
 npm test
+npx playwright install chromium webkit
+npm run test:e2e
 dotnet list MarketDesk.slnx package --vulnerable --include-transitive
 npm audit
 ```
 
 Backend tests cover price ordering, nullable calculations, payload parsing, subscription cleanup and capacity, symbol validation, shared caching, credential isolation, 401/403/429 handling, rate limits, SSE delivery, page routing, invalid requests, HTTPS/HSTS and response headers. Frontend tests cover supplied quote/profile rendering, local persistence, theme selection, news escaping, unsafe links, chart inspection, delayed quotes, unverified saved symbols and missing-key states.
+
+Browser tests start an isolated server on port 5161 and use clearly synthetic, browser-intercepted fixtures. Finnhub and Sentry are explicitly disabled for that server. Desktop Chromium, Android Chromium and iPhone WebKit profiles exercise real rendered HTML, CSS, JavaScript and local storage in both themes. This is browser emulation, not a claim of testing every physical phone. CI installs the required browsers and runs the same suite. If your default `dotnet` points to an older SDK, set `STOCKLUMO_DOTNET` to the absolute .NET 10 executable before running browser tests. Reports are ignored in Git under `playwright-report/`, `test-results/` and `output/`.
 
 ## Live verification after configuration
 

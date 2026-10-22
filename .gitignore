@@ -9,3 +9,6 @@ TestResults/
 **/appsettings.*.local.json
 .env
 .env.*
+playwright-report/
+test-results/
+output/

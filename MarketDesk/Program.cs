@@ -2,6 +2,26 @@ using Microsoft.AspNetCore.RateLimiting;
 using MarketDesk.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+// Explicit opt-in; tests and unconfigured deployments never send telemetry.
+if (builder.Configuration.GetValue<bool>("Sentry:Enabled") &&
+    !string.IsNullOrWhiteSpace(builder.Configuration["Sentry:Dsn"]))
+{
+    builder.WebHost.UseSentry(options =>
+    {
+        options.Dsn = builder.Configuration["Sentry:Dsn"];
+        options.Debug = false;
+        options.SendDefaultPii = false;
+        options.AttachStacktrace = false;
+        options.MaxRequestBodySize = Sentry.Extensibility.RequestSize.None;
+        options.MaxBreadcrumbs = 0;
+        options.IncludeActivityData = false;
+        options.TracesSampleRate = 0;
+        options.AutoSessionTracking = false;
+        options.EnableLogs = false;
+        options.MinimumEventLevel = LogLevel.Error;
+        options.SetBeforeSend(e => ErrorMonitoring.SafeEvent(e, builder.Environment.EnvironmentName));
+    });
+}
 // Render terminates TLS before forwarding traffic to this container.
 // Use platform configuration, never client-supplied forwarded headers.
 builder.Services.PostConfigure<Microsoft.AspNetCore.HostFiltering.HostFilteringOptions>(options =>

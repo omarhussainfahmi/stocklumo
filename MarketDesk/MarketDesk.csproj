@@ -9,4 +9,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="MarketDesk.Tests" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Sentry.AspNetCore" Version="6.12.1" />
+  </ItemGroup>
 </Project>
