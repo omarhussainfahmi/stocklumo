@@ -48,6 +48,13 @@ The selected source and rendered desktop capture were opened together for a full
 
 `MarketDesk/Views/Market/Index.cshtml`, shared `_SiteHeader`, new `_StockSearch` and `_Watchlist` partials; `wwwroot/css/market.css`, presentation code in `wwwroot/js/market.js`, local fonts/icons; `Program.cs` adds same-origin font permission only. No API contracts, financial calculations, persistence, authentication or Finnhub connection services were changed. Tests: updated jsdom partial expansion and six additional browser geometry/asset checks. Design rules and asset licenses are recorded in `DESIGN.md`.
 
-Deployment verification is recorded separately after the release becomes live.
+## Verified production release
+
+- Commit `f94be65697a6c4e85626cba5934928eff8470e6a`; Render Free deployment `dep-dbd3bpjncjis73bh24gg` became live on 22 October 2026 at 19:13 Riyadh time (16:13 UTC).
+- Production `/health`, homepage, markets, stock details, watchlist, news, screener, comparison, portfolio, earnings, privacy, terms and settings returned HTTP 200. Technical Analysis still returns 404. Fonts and company icons return 200; the response CSP permits same-origin fonts. Production stock markup has exactly one search and one watchlist slot.
+- Header search returned the actual MSFT/Microsoft result. No browser console errors were observed. Both production themes were captured in `output/observatory/production-dark.png` and `production-light.png`.
+- Genuine incoming trades were observed during the open US session: AAPL changed from 345.32 USD at 16:13:19 UTC to 345.73 USD at 16:16:02 UTC, with chart observations increasing from one to 33 and per-symbol LIVE timestamps advancing. Other ticker stocks also received fresh trade timestamps. These are past verification observations, not current quotes or hard-coded application values.
+- [GitHub Actions run 39811986812](https://github.com/omarhussainfahmi/stocklumo/actions/runs/39811986812) completed successfully for the deployed commit, including backend/frontend/browser checks and both dependency audits. Post-deployment Render application error logs returned no entries in the checked interval.
+- No paid plan, new hosting service, database change or new market-data provider was introduced.
 
 final result: passed

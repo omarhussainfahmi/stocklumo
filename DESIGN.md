@@ -24,7 +24,7 @@ Approved visual direction: the owner's navy Market Observatory reference, select
 
 The reference explicitly labels its candles and overlays as illustrations. Production never uses that raster chart, hard-coded quotes, fabricated candles, volume, indicators, holdings, descriptions, headlines or saved stocks. Historical range buttons remain hidden when the provider does not return usable history. Technical Analysis stays disabled.
 
-The existing SVG session chart remains interactive and can show one observation, multiple observed trades or genuine historical data when available. Horizontal range tracks use the existing validated provider bounds and current quote. The 52-week endpoints now appear in that range section instead of duplicate statistics tiles. Company fields remain limited to the current provider profile.
+The existing SVG session chart remains interactive and can show one observation, multiple observed trades or genuine historical data when available. Empty and single-observation plots are compact; multi-observation plots use the larger analytical layout. Horizontal range tracks use the existing validated provider bounds and current quote. The 52-week endpoints now appear in that range section instead of duplicate statistics tiles. Company fields remain limited to the current provider profile.
 
 All stock logos use a fixed map to local brand icons; unknown symbols receive no invented brand mark. No provider-supplied image URL is loaded. Company descriptions, headquarters and unsupported fields from the concept are intentionally omitted. Keep connection health separate from quote freshness.
 
