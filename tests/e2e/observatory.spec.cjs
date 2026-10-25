@@ -1,6 +1,30 @@
 const { test, expect, dismissPrivacy } = require('./fixtures.cjs');
 
 for (const theme of ['dark', 'light']) {
+  test(`company logos ${theme}: provider marks and failed images stay contained`, async ({ page }) => {
+    await page.addInitScript(theme => localStorage.setItem('stocklumo.theme', theme), theme);
+    await page.route('**/api/data/stock/JPM/profile', route => route.fulfill({ json: { state: 'ok', data: {
+      ticker: 'JPM', name: 'Fixture JPM', currency: 'USD', country: 'US', exchange: 'NYSE',
+      logo: 'https://static2.finnhub.io/file/publicdatany/finnhubimage/stock_logo/JPM.png'
+    } } }));
+    // A test-only image response; no real provider calls or market data.
+    await page.route('https://static2.finnhub.io/file/publicdatany/finnhubimage/stock_logo/JPM.png', route => route.fulfill({
+      contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><rect width="24" height="24" fill="#006b50"/></svg>'
+    }));
+    await page.goto('/stock/JPM');
+    await dismissPrivacy(page);
+    await expect(page.locator('#company-mark img')).toBeVisible();
+    await expect.poll(() => page.locator('#company-mark img').evaluate(image => image.naturalWidth)).toBeGreaterThan(0);
+    await page.locator('#company-mark img').evaluate(image => image.dispatchEvent(new Event('error')));
+    await expect(page.locator('#company-mark img')).toHaveCount(0);
+    await expect(page.locator('#company-mark .company-initials')).toBeVisible();
+    await expect(page.locator('#company-mark')).toContainText('JPM');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    for (const symbol of ['TSLA', 'V']) {
+      await page.goto(`/stock/${symbol}`);
+      await expect.poll(() => page.locator('#company-mark img').evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
+    }
+  });
   test(`observatory ${theme}: header search, company context and chart retain usable geometry`, async ({ page, isMobile }, testInfo) => {
     if (!isMobile) await page.setViewportSize({ width: 1487, height: 1058 });
     await page.addInitScript(theme => localStorage.setItem('stocklumo.theme', theme), theme);
@@ -12,8 +36,8 @@ for (const theme of ['dark', 'light']) {
     await expect(page.locator('.header #search')).toBeVisible();
     await expect(page.locator('#watch-section')).toHaveCount(1);
     await expect(page.locator('.brand img').first()).toHaveAttribute('src', /\/images\/stocklumo-mark\.svg/);
-    await expect(page.locator('#company-mark')).toHaveAttribute('src', /\/images\/icons\/apple\.svg$/);
-    await expect.poll(() => page.locator('#company-mark').evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
+    await expect(page.locator('#company-mark img')).toHaveAttribute('src', /\/images\/icons\/apple\.svg$/);
+    await expect.poll(() => page.locator('#company-mark img').evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
     await expect(page.locator('#chart-status')).toContainText('History unavailable');
     await expect(page.locator('[data-range]:visible')).toHaveCount(1);
     await expect(page.locator('.range-card svg')).toHaveCount(2);

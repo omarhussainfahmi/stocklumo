@@ -9,17 +9,51 @@
   const history = [];
   const spotlightSymbols = new Set();
   const tickerSymbols = ["AAPL", "MSFT", "AMZN", "GOOGL", "META", "TSLA", "V", "NVDA"];
-  // Local, licensed brand marks only; provider URLs never enter image attributes.
-  const companyMarks = { AAPL: "apple", MSFT: "microsoft", AMZN: "amazon", GOOGL: "google", META: "meta", NVDA: "nvidia" };
-  function companyMark(ticker, className) {
-    if (!Object.hasOwn(companyMarks, ticker)) return null;
-    const image = document.createElement("img");
-    image.src = `/images/icons/${companyMarks[ticker]}.svg`;
-    image.alt = "";
-    image.className = className;
-    image.width = image.height = 20;
-    return image;
+  const companyMarks = { AAPL: "apple", MSFT: "microsoft", AMZN: "amazon", GOOG: "google", GOOGL: "google", META: "meta", NVDA: "nvidia", TSLA: "tesla", V: "visa" };
+  const profileMarks = new Map();
+  function providerMark(value) {
+    if (typeof value !== "string") return null;
+    try {
+      const url = new URL(value);
+      return url.origin === "https://static2.finnhub.io" && !url.username && !url.password && !url.search && !url.hash &&
+        /^\/file\/publicdatany\/finnhubimage\/stock_logo\/[A-Za-z0-9_.-]+\.(png|jpe?g|svg|webp)$/i.test(url.pathname) ? url.href : null;
+    } catch { return null; }
   }
+  function paintCompanyMark(mark, ticker) {
+    const local = Object.hasOwn(companyMarks, ticker) ? `/images/icons/${companyMarks[ticker]}.svg` : null;
+    const source = local || profileMarks.get(ticker);
+    if (mark.dataset.source === (source || "")) return;
+    mark.dataset.source = source || "";
+    const badge = element("span", ticker.slice(0, 3), "company-initials");
+    badge.title = `${ticker} · logo unavailable`;
+    mark.replaceChildren(badge);
+    if (!source) return;
+    const image = document.createElement("img");
+    image.alt = "";
+    image.width = image.height = 56;
+    image.referrerPolicy = "no-referrer";
+    image.hidden = true;
+    if (local) image.className = "monochrome-mark";
+    image.onload = () => { image.hidden = false; badge.hidden = true; };
+    image.onerror = () => { image.remove(); badge.hidden = false; };
+    image.src = source;
+    mark.append(image);
+  }
+  function companyMark(ticker, className) {
+    if (!validSymbol(ticker)) return null;
+    const mark = element("span", "", `company-identity ${className}`);
+    mark.dataset.companyMark = ticker;
+    mark.setAttribute("aria-hidden", "true");
+    paintCompanyMark(mark, ticker);
+    return mark;
+  }
+  function registerCompanyMark(company) {
+    if (!validSymbol(company?.ticker)) return;
+    const source = providerMark(company.logo);
+    if (source) profileMarks.set(company.ticker, source);
+    document.querySelectorAll(`[data-company-mark="${company.ticker}"]`).forEach(mark => paintCompanyMark(mark, company.ticker));
+  }
+  window.StocklumoCompanyMarks = { create: companyMark, register: registerCompanyMark };
   const verifiedTickerSymbols = new Set();
   let featuredSymbols = [];
   let pulseSignature = "";
@@ -518,6 +552,7 @@
     for (const item of watch) {
       const result = await get(`/api/data/stock/${item}/profile`);
       if (result.data?.ticker === item) {
+        registerCompanyMark(result.data);
         verifiedSymbols.add(item);
         prices.set(item, {
           ...prices.get(item),
@@ -719,6 +754,7 @@
       return;
     }
     profile = result.data;
+    registerCompanyMark(profile);
     $("save-stock").disabled = false;
     prices.set(symbol, {
       ...prices.get(symbol),
@@ -730,7 +766,6 @@
     const mark = companyMark(symbol, "company-mark");
     if (mark && $("company-mark")) {
       mark.id = "company-mark";
-      mark.width = mark.height = 56;
       $("company-mark").replaceWith(mark);
     }
     $("symbol").textContent = symbol;
@@ -974,6 +1009,7 @@
       const heading = element("h3");
       const link = element("a", ticker);
       link.href = "/stock/" + ticker;
+      link.prepend(companyMark(ticker, "stock-mark"));
       heading.append(link);
       const name = element("p", "Loading company...", "muted");
       block.append(heading, name, element("strong", "-", "last"), element("p", "-", "delta"), element("p", "Waiting for a price", "age caption"));
@@ -989,6 +1025,7 @@
         continue;
       }
       name.textContent = result.data.name || ticker;
+      registerCompanyMark(result.data);
       prices.set(ticker, { ...prices.get(ticker), name: result.data.name, currency: result.data.currency, usMarket: isUsExchange(result.data) });
       if (featuredSymbols.includes(ticker)) spotlightSymbols.add(ticker);
       if (tickerSymbols.includes(ticker)) verifiedTickerSymbols.add(ticker);

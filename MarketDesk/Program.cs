@@ -80,7 +80,7 @@ if (app.Configuration["RENDER"] == "true" && app.Environment.IsProduction())
 }
 app.Use(async (context, next) =>
 {
-    context.Response.Headers.ContentSecurityPolicy = "default-src 'none'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; font-src 'self'; connect-src 'self' https://cloudflareinsights.com; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'";
+    context.Response.Headers.ContentSecurityPolicy = "default-src 'none'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; font-src 'self'; connect-src 'self' https://cloudflareinsights.com; img-src 'self' https://static2.finnhub.io; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'";
     context.Response.Headers.XContentTypeOptions = "nosniff";
     context.Response.Headers.XFrameOptions = "DENY";
     context.Response.Headers["Referrer-Policy"] = "no-referrer";
