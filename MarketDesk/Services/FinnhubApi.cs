@@ -5,12 +5,15 @@ using Microsoft.Extensions.Caching.Memory;
 namespace MarketDesk.Services;
 
 public sealed record ProviderResult(string State, string Message, JsonElement? Data = null);
+public sealed record CompanyLogo(byte[] Bytes, string ContentType);
 
 // One bounded cache and request budget serve every browser and the background feed.
 public sealed class FinnhubApi(IHttpClientFactory clients, IConfiguration configuration) : IDisposable
 {
     private readonly MemoryCache cache = new(new MemoryCacheOptions { SizeLimit = 16 * 1024 * 1024 });
     private readonly SemaphoreSlim gate = new(1, 1);
+    private readonly MemoryCache logoCache = new(new MemoryCacheOptions { SizeLimit = 8 * 1024 * 1024 });
+    private readonly SemaphoreSlim logoGate = new(2, 2);
     private DateTimeOffset window = DateTimeOffset.UtcNow;
     private DateTimeOffset blockedUntil;
     private int requests;
@@ -85,5 +88,44 @@ public sealed class FinnhubApi(IHttpClientFactory clients, IConfiguration config
         }
         finally { gate.Release(); }
     }
-    public void Dispose() { cache.Dispose(); gate.Dispose(); }
+    public async Task<CompanyLogo?> LogoAsync(string file, CancellationToken token)
+    {
+        if (file.Length > 120 || !System.Text.RegularExpressions.Regex.IsMatch(file, @"\A[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(png|jpe?g|webp)\z", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) return null;
+        if (logoCache.TryGetValue(file, out CompanyLogo? cached)) return cached;
+        await logoGate.WaitAsync(token);
+        try
+        {
+            if (logoCache.TryGetValue(file, out cached)) return cached;
+            CompanyLogo? result = null;
+            try
+            {
+                // Separate client: no provider key, cookies, caller URL or redirects.
+                using var client = clients.CreateClient("CompanyLogos");
+                using var response = await client.GetAsync(Uri.EscapeDataString(file), token);
+                // Finnhub currently redirects stock images to its static9 CDN.
+                // Follow one exact-host, same-file redirect only, never arbitrary URLs.
+                var location = response.Headers.Location;
+                var safeRedirect = response.StatusCode is HttpStatusCode.MovedPermanently or HttpStatusCode.Found or HttpStatusCode.TemporaryRedirect or HttpStatusCode.PermanentRedirect &&
+                    location is { IsAbsoluteUri: true, Scheme: "https", Host: "static9.finnhub.io", Port: 443, UserInfo: "", Query: "", Fragment: "" } &&
+                    location.AbsolutePath == "/file/publicdatany/finnhubimage/stock_logo/" + file;
+                using var redirected = safeRedirect ? await client.GetAsync(location, token) : null;
+                var imageResponse = redirected ?? response;
+                if (imageResponse.IsSuccessStatusCode)
+                {
+                    var bytes = await imageResponse.Content.ReadAsByteArrayAsync(token);
+                    var type = imageResponse.Content.Headers.ContentType?.MediaType;
+                    var png = type == "image/png" && bytes.AsSpan().StartsWith(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 });
+                    var jpeg = type == "image/jpeg" && bytes.Length >= 3 && bytes[0] == 255 && bytes[1] == 216 && bytes[2] == 255;
+                    var webp = type == "image/webp" && bytes.Length >= 12 && bytes.AsSpan(0, 4).SequenceEqual("RIFF"u8) && bytes.AsSpan(8, 4).SequenceEqual("WEBP"u8);
+                    if (bytes.Length <= 256 * 1024 && (png || jpeg || webp)) result = new(bytes, type!);
+                }
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+            catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException) { }
+            logoCache.Set(file, result, new MemoryCacheEntryOptions { Size = result?.Bytes.Length + 128 ?? 128, AbsoluteExpirationRelativeToNow = result is null ? TimeSpan.FromMinutes(5) : TimeSpan.FromHours(12) });
+            return result;
+        }
+        finally { logoGate.Release(); }
+    }
+    public void Dispose() { cache.Dispose(); gate.Dispose(); logoCache.Dispose(); logoGate.Dispose(); }
 }

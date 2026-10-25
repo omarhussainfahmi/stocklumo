@@ -8,12 +8,13 @@ for (const theme of ['dark', 'light']) {
       logo: 'https://static2.finnhub.io/file/publicdatany/finnhubimage/stock_logo/JPM.png'
     } } }));
     // A test-only image response; no real provider calls or market data.
-    await page.route('https://static2.finnhub.io/file/publicdatany/finnhubimage/stock_logo/JPM.png', route => route.fulfill({
+    await page.route('**/api/data/company-logo/JPM.png', route => route.fulfill({
       contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><rect width="24" height="24" fill="#006b50"/></svg>'
     }));
     await page.goto('/stock/JPM');
     await dismissPrivacy(page);
     await expect(page.locator('#company-mark img')).toBeVisible();
+    await expect(page.locator('#company-mark img')).toHaveAttribute('src', '/api/data/company-logo/JPM.png');
     await expect.poll(() => page.locator('#company-mark img').evaluate(image => image.naturalWidth)).toBeGreaterThan(0);
     await page.locator('#company-mark img').evaluate(image => image.dispatchEvent(new Event('error')));
     await expect(page.locator('#company-mark img')).toHaveCount(0);

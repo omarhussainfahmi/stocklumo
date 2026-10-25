@@ -9,6 +9,15 @@ namespace MarketDesk.Controllers;
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public sealed class DataController(FinnhubApi api, MarketStore store) : ControllerBase
 {
+    [HttpGet("company-logo/{file}")]
+    public async Task<IActionResult> Logo(string file, CancellationToken token)
+    {
+        var logo = await api.LogoAsync(file, token);
+        if (logo is null) return NotFound();
+        Response.Headers.CacheControl = "public, max-age=43200";
+        return File(logo.Bytes, logo.ContentType);
+    }
+
     [HttpGet("search")]
     public async Task<IActionResult> Search(string? q, CancellationToken token)
     {

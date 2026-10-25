@@ -15,8 +15,8 @@
     if (typeof value !== "string") return null;
     try {
       const url = new URL(value);
-      return url.origin === "https://static2.finnhub.io" && !url.username && !url.password && !url.search && !url.hash &&
-        /^\/file\/publicdatany\/finnhubimage\/stock_logo\/[A-Za-z0-9_.-]+\.(png|jpe?g|svg|webp)$/i.test(url.pathname) ? url.href : null;
+      return ["https://static2.finnhub.io", "https://static9.finnhub.io"].includes(url.origin) && !url.username && !url.password && !url.search && !url.hash &&
+        /^\/file\/publicdatany\/finnhubimage\/stock_logo\/[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(png|jpe?g|webp)$/i.test(url.pathname) ? `/api/data/company-logo/${encodeURIComponent(url.pathname.split("/").pop())}` : null;
     } catch { return null; }
   }
   function paintCompanyMark(mark, ticker) {

@@ -29,6 +29,7 @@ test("provider logos upgrade existing unknown-company badges without extra API r
   marks.register({ ticker: "JPM", logo: "https://static2.finnhub.io/file/publicdatany/finnhubimage/stock_logo/JPM.png" });
   const image = mark.querySelector("img");
   assert.ok(image); assert.equal(image.referrerPolicy, "no-referrer");
+  assert.equal(image.getAttribute("src"), "/api/data/company-logo/JPM.png");
   image.dispatchEvent(new w.Event("load"));
   assert.equal(image.hidden, false); assert.equal(mark.firstChild.hidden, true);
   image.dispatchEvent(new w.Event("error"));
