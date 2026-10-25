@@ -17,3 +17,12 @@ Verification before publishing:
 Deployment status must be checked separately after publication; passing local tests is not proof of a live release.
 
 Follow-up evidence: Finnhub returned an HTTP 302 redirect to static9.finnhub.io for JPM.png. The same-origin endpoint retrieved the real image successfully with HTTP 200, image/png, 83,397 bytes and public max-age=43200. Added explicit tests rejecting other hosts, HTTP, credentials, different filenames and query-bearing redirects. The 12 logo/layout browser checks passed after the proxy change; broader 126-check suite passed earlier in this fix.
+
+## Production verification
+
+- Follow-up application commit: 5e0e26f937d2514e6faae49bb82d3ae574899856.
+- Render deployment dep-dbf99bmq1p3s73f0aodg is live; finished 26 October 2026 at 02:46 Riyadh (25 October 23:46 UTC). Existing Free service and configuration retained.
+- Production health and same-origin JPM image endpoint returned 200. JPM returned an 83,397-byte PNG and decoded in the browser at 56 x 56 CSS pixels. Tesla and Visa bundled marks also decoded on their real stock pages.
+- Seven of eight actual daily spotlight marks decoded, including provider filenames that are numeric rather than ticker names. OBX had no usable image and retained the labeled ticker fallback. No universal provider-logo coverage is claimed.
+- Full initial browser regression suite passed (126); after switching to same-origin delivery, all 12 logo/layout follow-up checks passed across both themes and all three browser profiles. Final backend suite: 116 passed; frontend suite: 58 passed, followed by three targeted checks after the CDN-host validation change.
+- The first release's GitHub Actions run 40245527208 completed successfully. Follow-up run 40246217929 was still running at this record's update; local tests and the live Render release are verified separately.
