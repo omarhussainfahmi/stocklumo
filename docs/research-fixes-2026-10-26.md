@@ -17,4 +17,10 @@ Targeted regression checks cover both themes, 1920px and 1280px desktop grids, A
 Final full-suite and deployment results are recorded after they complete. Provider entitlement remains an external limitation; the interface correction is not a claim that historical access was enabled.
 
 Release build succeeded with zero warnings/errors; 116 backend tests and 59 frontend tests passed. The 135-check browser run passed 132; three existing comparison checks still expected the old unavailable wording. After updating those assertions to the new message and explicitly asserting no historical chart, all three passed on rerun (desktop Chromium, Android Chromium and iPhone WebKit). All nine new research checks also passed. The only mechanical design advisory concerns the existing, unchanged homepage grid background. No physical-device certification is claimed.
+## Live verification
 
+Application commit 3060e84b4bd475affff501affaf80fe6b9671b5b deployed as dep-dbfp6fss728c73ba74tg, live on 26 October 2026 at 20:52 Riyadh (17:52 UTC). The Free service, keys, calculations and API contracts were unchanged.
+
+Production comparison loaded two genuine stock rows. Choosing 1M returned the real Finnhub access denial, reset to Latest snapshot, disabled 1M/6M/1Y choices, exposed Retry history and retained the current metric comparison without a fabricated history chart. Production screener loaded 12 rows. After expanding the ranking and scrolling down, ranking and inspector bottom bounds both measured 114.515625px in the inspected browser viewport; page overflow was false. The two live pages remain available in the browser.
+
+GitHub Actions run 40372611222 was still running at this record update. Local build/backend/frontend checks and browser cases are documented above separately; no completed CI result is claimed yet.
