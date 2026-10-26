@@ -75,8 +75,10 @@ test('comparison reports missing history without inventing a chart', async ({ pa
   await page.getByRole('button', { name: 'Compare', exact: true }).click();
   await expect(page.locator('#research-status')).toHaveAttribute('role', 'alert');
   await page.getByLabel('Tickers (comma-separated)', { exact: true }).fill('AAPL, MSFT');
+  await page.getByLabel('Historical range', { exact: true }).selectOption('1M');
   await page.getByRole('button', { name: 'Compare', exact: true }).click();
-  await expect(page.locator('#research-results')).toContainText(/unavailable/i);
+  await expect(page.locator('#research-results')).toContainText('Historical prices could not load');
+  await expect(page.locator('.research-chart')).toHaveCount(0);
 });
 
 test('earnings filters the watchlist and keeps empty results explicit', async ({ page }) => {

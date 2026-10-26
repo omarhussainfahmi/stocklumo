@@ -686,12 +686,29 @@
     const input = field("Tickers (comma-separated)", "text", "AAPL, MSFT");
     input.maxLength = 80;
     const range = select("Historical range", [
+      ["", "Latest snapshot"],
       ["1M", "1 month"],
       ["6M", "6 months"],
       ["1Y", "1 year"],
     ]);
+    const rangeHelp = node("p", "Range changes historical prices only; snapshot metrics use the latest quotes.");
+    rangeHelp.id = "comparison-range-help";
+    rangeHelp.className = "comparison-range-help muted";
+    controls.after(rangeHelp);
+    range.setAttribute("aria-describedby", rangeHelp.id);
+    range.setAttribute("aria-label", "Historical range");
+    let compared = false, loading = false, historyBlocked = false, lastRange = "1M";
     const run = button("Compare", load);
+    const retryHistory = button("Retry history", () => {
+      historyBlocked = false;
+      [...range.options].forEach(option => option.disabled = false);
+      range.value = lastRange;
+      load();
+    });
+    retryHistory.hidden = true;
+    range.onchange = () => { if (compared) load(); };
     async function load() {
+      if (loading) return;
       let items;
       try {
         items = symbols(input.value, 2, 5);
@@ -700,16 +717,24 @@
         return;
       }
       setBusy(run, true);
+      loading = true;
+      compared = true;
+      retryHistory.disabled = true;
+      const requestedRange = range.value;
+      if (requestedRange) lastRange = requestedRange;
       results.replaceChildren();
       status.textContent = "Loading comparable metrics...";
       const rows = [];
       const history = [];
+      const historyFailures = [];
       for (const symbol of items) {
         rows.push(await get("/api/research/stock/" + symbol));
-        const response = await get(
-          `/api/data/stock/${symbol}/chart?range=${range.value}`,
-        );
-        history.push({ name: symbol, points: math.candles(response.data) });
+        if (requestedRange && !historyBlocked) {
+          const response = await get(`/api/data/stock/${symbol}/chart?range=${requestedRange}`);
+          history.push({ name: symbol, points: math.candles(response.data) });
+          if (response.state !== "ok") historyFailures.push(response);
+          if (response.state === "unavailable" && /current Finnhub access/i.test(response.message || "")) historyBlocked = true;
+        }
       }
       table(
         [
@@ -734,23 +759,35 @@
         ]),
       );
       comparisonMetrics(rows, items);
-      const normalized = math.normalize(history);
-      if (normalized.length)
-        plot(normalized, "Normalized closing prices (base 100)");
-      else {
+      const normalized = history.length === items.length ? math.normalize(history) : [];
+      if (requestedRange && normalized.length) {
+        plot(normalized, `Historical performance · ${range.selectedOptions[0].textContent} (base 100)`);
+        rangeHelp.textContent = "Historical chart updated. Snapshot metrics still use the latest quotes.";
+      } else {
         bars(rows.map((r, i) => ({ symbol: items[i], value: r.changePercent, detail: quoteDetail({ ...r, symbol: items[i] }) })),
           "Selected stocks · day change", "%", "Day change in each stock's currency, not a historical return. Quote times vary.");
-        results.append(
-          node(
-            "p",
-            "Historical comparison unavailable: insufficient shared dates or provider access.",
-          ),
-        );
+        if (requestedRange) {
+          const historyNotice = node("p", historyBlocked
+            ? "Historical prices unavailable with current Finnhub access. Showing the latest snapshot."
+            : historyFailures.length ? "Historical prices could not load. Showing the latest snapshot; retry the selected range."
+            : "Not enough shared closing-price dates for this range. Showing the latest snapshot.");
+          historyNotice.setAttribute("role", "status");
+          results.append(historyNotice);
+        }
+        rangeHelp.textContent = historyBlocked ? "History unavailable with current Finnhub access. Snapshot metrics remain available."
+          : "Range changes historical prices only; snapshot metrics use the latest quotes.";
       }
+      if (historyBlocked) {
+        range.value = "";
+        [...range.options].forEach(option => option.disabled = !!option.value);
+      }
+      retryHistory.hidden = !historyBlocked && (!requestedRange || !!normalized.length);
       status.textContent = rows.some((r) => r.state !== "ok")
         ? "Loaded with missing fields. Retry in a minute if limited."
         : "Comparison loaded. Check each quote time.";
       setBusy(run, false);
+      retryHistory.disabled = false;
+      loading = false;
     }
   }
   if (page === "/screener") screener();

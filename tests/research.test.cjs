@@ -323,6 +323,7 @@ test("comparison renders labeled shared-scale charts and keeps unavailable histo
   };
   w.eval(readFileSync("MarketDesk/wwwroot/js/research.js", "utf8"));
   const run = [...w.document.querySelectorAll("button")].find(b => b.textContent === "Compare");
+  w.document.querySelector('#research-controls select').value = '1M';
   run.click();
   await new Promise(r => setTimeout(r, 20));
   assert.equal(w.document.querySelectorAll(".research-chart path").length, 2);
@@ -340,7 +341,7 @@ test("comparison renders labeled shared-scale charts and keeps unavailable histo
   assert.equal(w.document.querySelector(".research-chart"), null);
   assert.deepEqual([...w.document.querySelectorAll(".data-bar strong")].map(n => n.textContent), ["AAPL", "MSFT"]);
   assert.match(w.document.querySelector(".bar-chart figcaption").textContent, /not a historical return/);
-  assert.match(w.document.querySelector("#research-results").textContent, /Historical comparison unavailable/);
+  assert.match(w.document.querySelector("#research-results").textContent, /Historical prices could not load/);
   const before = requests;
   w.document.querySelector("#research-controls input").value = "AAPL";
   run.click();
@@ -359,6 +360,42 @@ async function researchPage(path, response, holdings) {
   await new Promise(r => setTimeout(r, 25));
   return dom;
 }
+
+test("comparison defaults to snapshot and rejects unavailable history without misleading range choices", async () => {
+  const historyRequests = [];
+  let allowed = false;
+  const dom = await researchPage("compare", url => {
+    if (url.includes('/chart')) {
+      historyRequests.push(url);
+      return allowed ? {state:'ok', data:{s:'ok',c:[10,12],t:[1700000000,1700086400]}}
+        : {state:'unavailable',message:'This information is unavailable under the current Finnhub access.'};
+    }
+    return {state:'ok',symbol:url.split('/').at(-1),price:12,currency:'USD',changePercent:2};
+  });
+  const w = dom.window, d = w.document, range = d.querySelector('#research-controls select');
+  const run = [...d.querySelectorAll('button')].find(b=>b.textContent === 'Compare');
+  run.click(); await new Promise(r=>setTimeout(r,25));
+  assert.equal(range.value, ''); assert.equal(historyRequests.length, 0);
+  range.value = '1M'; range.dispatchEvent(new w.Event('change'));
+  await new Promise(r=>setTimeout(r,25));
+  assert.equal(historyRequests.length, 1);
+  assert.equal(range.value, '');
+  assert.ok([...range.options].filter(o=>o.value).every(o=>o.disabled));
+  assert.match(d.getElementById('comparison-range-help').textContent, /History unavailable/);
+  assert.equal(d.querySelector('.research-chart'), null);
+  const retry = [...d.querySelectorAll('button')].find(b=>b.textContent === 'Retry history');
+  assert.equal(retry.hidden,false);
+  allowed = true; retry.click(); await new Promise(r=>setTimeout(r,25));
+  assert.equal(d.querySelectorAll('.research-chart path').length,2);
+  assert.ok([...range.options].every(o=>!o.disabled));
+  const previousCount = historyRequests.length;
+  range.value = '6M'; range.dispatchEvent(new w.Event('change'));
+  await new Promise(r=>setTimeout(r,25));
+  assert.equal(historyRequests.length, previousCount + 2);
+  assert.ok(historyRequests.slice(-2).every(url=>url.endsWith('range=6M')));
+  assert.match(d.querySelector('.research-chart').getAttribute('aria-label'), /6 months/);
+  w.close();
+});
 
 test("large earnings results page every record and lazily expand announcement days without refetching", async () => {
   // Synthetic provider-shaped records are test fixtures, never application data.
