@@ -69,15 +69,14 @@ test('portfolio validates, saves, edits and removes an isolated practice holding
   await expect(page.locator('#research-results')).toContainText('No practice holdings');
 });
 
-test('comparison reports missing history without inventing a chart', async ({ page }) => {
+test('comparison validates stock selection and shows honest snapshot data', async ({ page }) => {
   await visit(page, '/compare');
   await page.getByLabel('Tickers (comma-separated)', { exact: true }).fill('AAPL');
   await page.getByRole('button', { name: 'Compare', exact: true }).click();
   await expect(page.locator('#research-status')).toHaveAttribute('role', 'alert');
   await page.getByLabel('Tickers (comma-separated)', { exact: true }).fill('AAPL, MSFT');
-  await page.getByLabel('Historical range', { exact: true }).selectOption('1M');
   await page.getByRole('button', { name: 'Compare', exact: true }).click();
-  await expect(page.locator('#research-results')).toContainText('Historical prices could not load');
+  await expect(page.locator('#comparison-range-help')).toContainText('Historical prices are unavailable');
   await expect(page.locator('.research-chart')).toHaveCount(0);
 });
 

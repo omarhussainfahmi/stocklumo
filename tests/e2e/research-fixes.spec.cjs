@@ -26,31 +26,22 @@ for (const theme of ['dark','light']) {
   });
 }
 
-test('comparison range reloads history and explains access failures',async({page})=>{
-  const requests=[]; let available=true;
-  await page.route('**/api/data/stock/*/chart?*',route=>{
-    const range=new URL(route.request().url()).searchParams.get('range'); requests.push(range);
-    return route.fulfill({json:available ? {state:'ok',data:{s:'ok',t:[1700000000,1700086400],c:range==='1M'?[10,11]:[10,15]}}
-      : {state:'unavailable',message:'This information is unavailable under the current Finnhub access.'}});
-  });
+test('comparison offers static snapshot information and no history requests',async({page},testInfo)=>{
+  const historyRequests=[];
+  page.on('request',request=>{if(request.url().includes('/chart?'))historyRequests.push(request.url());});
   await page.goto('/compare'); await dismissPrivacy(page);
+  await expect(page.getByLabel('Historical range',{exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Retry history',exact:true})).toHaveCount(0);
+  await expect(page.locator('.comparison-mode')).toContainText('Latest snapshot');
+  await expect(page.locator('#comparison-range-help')).toContainText('Historical prices are unavailable');
   await page.getByRole('button',{name:'Compare',exact:true}).click();
-  await expect(page.locator('.bar-chart')).toBeVisible(); expect(requests).toEqual([]);
-  const range=page.getByLabel('Historical range',{exact:true});
-  await range.selectOption('1M');
-  await expect(page.locator('.research-chart')).toHaveAttribute('aria-label',/1 month/);
-  await range.selectOption('6M');
-  await expect(page.locator('.research-chart')).toHaveAttribute('aria-label',/6 months/);
-  // Accessible data values establish that a new range response was rendered.
-  await expect(page.locator('#research-results details')).toContainText('150');
-  expect(requests.slice(-2)).toEqual(['6M','6M']);
-  available=false; await range.selectOption('1Y');
-  await expect(page.locator('#comparison-range-help')).toContainText('History unavailable');
-  await expect(range).toHaveValue('');
-  await expect(page.locator('.research-chart')).toHaveCount(0);
-  await expect(page.getByRole('button',{name:'Retry history'})).toBeVisible();
-  await expect(range.locator('option[value="1M"]')).toHaveJSProperty('disabled',true);
-  available=true; await page.getByRole('button',{name:'Retry history'}).click();
-  await expect(page.locator('.research-chart')).toBeVisible();
-  await expect(range.locator('option[value="1M"]')).toHaveJSProperty('disabled',false);
+  await expect(page.locator('#research-results > .table-wrap tbody tr')).toHaveCount(2);
+  await expect(page.locator('.bar-chart')).toBeVisible();
+  await expect(page.locator('.comparison-metrics > figure')).toHaveCount(3);
+  await page.getByLabel('Tickers (comma-separated)',{exact:true}).fill('AAPL, MSFT, NVDA');
+  await page.getByRole('button',{name:'Compare',exact:true}).click();
+  await expect(page.locator('#research-results > .table-wrap tbody tr')).toHaveCount(3);
+  expect(historyRequests).toEqual([]);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+  await page.screenshot({path:testInfo.outputPath('compare-snapshot.png')});
 });

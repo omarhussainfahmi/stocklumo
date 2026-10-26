@@ -24,3 +24,10 @@ Application commit 3060e84b4bd475affff501affaf80fe6b9671b5b deployed as dep-dbfp
 Production comparison loaded two genuine stock rows. Choosing 1M returned the real Finnhub access denial, reset to Latest snapshot, disabled 1M/6M/1Y choices, exposed Retry history and retained the current metric comparison without a fabricated history chart. Production screener loaded 12 rows. After expanding the ranking and scrolling down, ranking and inspector bottom bounds both measured 114.515625px in the inspected browser viewport; page overflow was false. The two live pages remain available in the browser.
 
 GitHub Actions run 40372611222 was still running at this record update. Local build/backend/frontend checks and browser cases are documented above separately; no completed CI result is claimed yet.
+## Owner-requested snapshot-only refinement
+
+The owner's later screenshot explicitly requests static information instead of the unavailable Historical range options and Retry history button. This supersedes the interactive-history comparison behavior described earlier in this record.
+
+The comparison form now displays plain Data view / Latest snapshot text, a concise historical-access note and the existing Compare action. Historical options, retry controls, comparison candle requests and obsolete comparison-only history branches are removed. Current tables, fundamental charts, day-change bars, stock-count validation and quote timestamps remain. Stock-detail and portfolio history code and endpoints are unchanged. The form has scoped desktop and mobile layout rules.
+
+Verification: Release build passed with zero warnings/errors; all 59 frontend tests passed; 12 relevant browser checks passed across desktop Chromium, Android Chromium and iPhone WebKit, including both-theme accessibility, overflow, stock validation, snapshot refresh and zero historical requests. Three screenshot-capture follow-ups also passed; the desktop render was inspected. Synthetic values are isolated fixtures, not production market data. Backend tests were not rerun for this frontend-only refinement.

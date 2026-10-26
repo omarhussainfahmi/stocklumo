@@ -681,112 +681,47 @@
   }
   async function compare() {
     $("research-title").textContent = "Compare stocks";
-    introduction("Compare 2-5 stocks, their fundamentals and price performance.",
-      "Metrics use trailing 12 months (TTM); market cap is USD millions. Prices keep their currencies. Historical charts share dates and start at 100, excluding dividends and currency conversion. Quote snapshots use each stock's previous close.");
+    introduction("Compare 2-5 stocks using their latest quotes and fundamentals.",
+      "Metrics use trailing 12 months (TTM); market cap is USD millions. Prices keep their currencies. Day changes use each stock's previous close, not historical returns.");
+    controls.classList.add("comparison-controls");
     const input = field("Tickers (comma-separated)", "text", "AAPL, MSFT");
     input.maxLength = 80;
-    const range = select("Historical range", [
-      ["", "Latest snapshot"],
-      ["1M", "1 month"],
-      ["6M", "6 months"],
-      ["1Y", "1 year"],
-    ]);
-    const rangeHelp = node("p", "Range changes historical prices only; snapshot metrics use the latest quotes.");
-    rangeHelp.id = "comparison-range-help";
-    rangeHelp.className = "comparison-range-help muted";
-    controls.after(rangeHelp);
-    range.setAttribute("aria-describedby", rangeHelp.id);
-    range.setAttribute("aria-label", "Historical range");
-    let compared = false, loading = false, historyBlocked = false, lastRange = "1M";
+    const mode = node("div");
+    mode.className = "comparison-mode";
+    mode.append(node("span", "Data view"), node("strong", "Latest snapshot"));
+    controls.insertBefore(mode, actions);
+    const note = node("p", "Historical prices are unavailable with current Finnhub access.");
+    note.id = "comparison-range-help";
+    note.className = "comparison-range-help muted";
+    controls.after(note);
+    let loading = false;
     const run = button("Compare", load);
-    const retryHistory = button("Retry history", () => {
-      historyBlocked = false;
-      [...range.options].forEach(option => option.disabled = false);
-      range.value = lastRange;
-      load();
-    });
-    retryHistory.hidden = true;
-    range.onchange = () => { if (compared) load(); };
     async function load() {
       if (loading) return;
       let items;
-      try {
-        items = symbols(input.value, 2, 5);
-      } catch (e) {
-        validationError(e.message, [input]);
-        return;
-      }
+      try { items = symbols(input.value, 2, 5); }
+      catch (e) { validationError(e.message, [input]); return; }
       setBusy(run, true);
       loading = true;
-      compared = true;
-      retryHistory.disabled = true;
-      const requestedRange = range.value;
-      if (requestedRange) lastRange = requestedRange;
       results.replaceChildren();
       status.textContent = "Loading comparable metrics...";
       const rows = [];
-      const history = [];
-      const historyFailures = [];
-      for (const symbol of items) {
-        rows.push(await get("/api/research/stock/" + symbol));
-        if (requestedRange && !historyBlocked) {
-          const response = await get(`/api/data/stock/${symbol}/chart?range=${requestedRange}`);
-          history.push({ name: symbol, points: math.candles(response.data) });
-          if (response.state !== "ok") historyFailures.push(response);
-          if (response.state === "unavailable" && /current Finnhub access/i.test(response.message || "")) historyBlocked = true;
-        }
-      }
+      for (const symbol of items) rows.push(await get("/api/research/stock/" + symbol));
       table(
-        [
-          "Stock",
-          "Price / currency",
-          "Day change (%)",
-          "Cap (USD m)",
-          "P/E TTM",
-          "Dividend yield TTM (%)",
-          "Quote time",
-        ],
+        ["Stock", "Price / currency", "Day change (%)", "Cap (USD m)", "P/E TTM", "Dividend yield TTM (%)", "Quote time"],
         rows.map((r, i) => [
-          stockLink(items[i]),
-          `${fmt(r.price)} ${r.currency || ""}`,
-          change(r.changePercent),
-          fmt(r.marketCapMillions),
-          fmt(r.peTtm),
-          fmt(r.dividendYieldTtm),
-          r.timestamp
-            ? new Date(r.timestamp * 1000).toLocaleString()
-            : r.message || "Unavailable",
+          stockLink(items[i]), `${fmt(r.price)} ${r.currency || ""}`, change(r.changePercent),
+          fmt(r.marketCapMillions), fmt(r.peTtm), fmt(r.dividendYieldTtm),
+          r.timestamp ? new Date(r.timestamp * 1000).toLocaleString() : r.message || "Unavailable",
         ]),
       );
       comparisonMetrics(rows, items);
-      const normalized = history.length === items.length ? math.normalize(history) : [];
-      if (requestedRange && normalized.length) {
-        plot(normalized, `Historical performance · ${range.selectedOptions[0].textContent} (base 100)`);
-        rangeHelp.textContent = "Historical chart updated. Snapshot metrics still use the latest quotes.";
-      } else {
-        bars(rows.map((r, i) => ({ symbol: items[i], value: r.changePercent, detail: quoteDetail({ ...r, symbol: items[i] }) })),
-          "Selected stocks · day change", "%", "Day change in each stock's currency, not a historical return. Quote times vary.");
-        if (requestedRange) {
-          const historyNotice = node("p", historyBlocked
-            ? "Historical prices unavailable with current Finnhub access. Showing the latest snapshot."
-            : historyFailures.length ? "Historical prices could not load. Showing the latest snapshot; retry the selected range."
-            : "Not enough shared closing-price dates for this range. Showing the latest snapshot.");
-          historyNotice.setAttribute("role", "status");
-          results.append(historyNotice);
-        }
-        rangeHelp.textContent = historyBlocked ? "History unavailable with current Finnhub access. Snapshot metrics remain available."
-          : "Range changes historical prices only; snapshot metrics use the latest quotes.";
-      }
-      if (historyBlocked) {
-        range.value = "";
-        [...range.options].forEach(option => option.disabled = !!option.value);
-      }
-      retryHistory.hidden = !historyBlocked && (!requestedRange || !!normalized.length);
+      bars(rows.map((r, i) => ({ symbol: items[i], value: r.changePercent, detail: quoteDetail({ ...r, symbol: items[i] }) })),
+        "Selected stocks · day change", "%", "Day change in each stock's currency, not a historical return. Quote times vary.");
       status.textContent = rows.some((r) => r.state !== "ok")
         ? "Loaded with missing fields. Retry in a minute if limited."
         : "Comparison loaded. Check each quote time.";
       setBusy(run, false);
-      retryHistory.disabled = false;
       loading = false;
     }
   }
