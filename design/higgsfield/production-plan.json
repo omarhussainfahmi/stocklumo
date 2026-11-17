@@ -1,0 +1,169 @@
+{
+  "version": 1,
+  "status": "blocked_before_media_generation",
+  "website": "Stocklumo",
+  "scope": "Homepage decorative atmosphere only; existing routes, market data, logo, hero height and working page proportions remain unchanged.",
+  "direction": {
+    "name": "Signal into focus",
+    "mode": "Persuade opening; Operate below",
+    "identity": "Original ribbon SVGs and exact-color Three.js front faces remain authoritative",
+    "primary_action": {
+      "label": "Explore markets",
+      "path": "/markets"
+    },
+    "secondary_action": {
+      "label": "Your watchlist",
+      "path": "/watchlist"
+    },
+    "search": "Existing _StockSearch partial and working stock routes",
+    "typography": "Existing self-hosted Manrope; no new font or runtime dependency"
+  },
+  "source_paths": {
+    "logo_light": "MarketDesk/wwwroot/images/stocklumo-mark.svg",
+    "logo_dark": "MarketDesk/wwwroot/images/stocklumo-mark-dark.svg",
+    "page": "MarketDesk/Views/Market/Index.cshtml",
+    "theme": "MarketDesk/wwwroot/css/observatory.css",
+    "scene": "frontend/hero-scene.js",
+    "bootstrap": "MarketDesk/wwwroot/js/hero.js"
+  },
+  "media": {
+    "provider": "Higgsfield",
+    "image_model": "gpt_image_2_5",
+    "video_model": "seedance_2_5",
+    "format": "16:9",
+    "duration_seconds": 6,
+    "resolution": "720p",
+    "generate_audio": false,
+    "variants": [
+      "dark",
+      "light"
+    ],
+    "preserve_logo_as_separate_layer": true,
+    "accepted_assets": [],
+    "frame_manifest": null,
+    "output_policy": "No runtime URLs, empty media elements, frame loaders, or CSP changes until actual media passes review."
+  },
+  "timing": {
+    "implementation_status": "native_three_js_blend_implemented_in_frontend/hero-story.js; generated_media_timeline_remains_proposal",
+    "coordinate": "Normalized travel from hero top reaching sticky header to hero bottom reaching sticky header. No added pin spacer or page height.",
+    "desktop_active_travel": "Existing hero height, about 0.56–0.8 viewport heights depending on viewport; measure at integration.",
+    "mobile_active_travel": "Existing automatic hero height, measured on device; no extra travel.",
+    "beats": [
+      {
+        "id": "focus",
+        "desktop": [
+          0,
+          0.22
+        ],
+        "mobile": [
+          0,
+          0.3
+        ],
+        "source_seconds": [
+          0,
+          1.3
+        ],
+        "frame_range": null,
+        "hold": true,
+        "copy": "Current heading, description, search and two actions are visible from initial HTML.",
+        "focal_point": [
+          0.82,
+          0.5
+        ],
+        "camera": "Locked. Original logo in its separate right-hand stage."
+      },
+      {
+        "id": "gather",
+        "desktop": [
+          0.22,
+          0.72
+        ],
+        "mobile": [
+          0.3,
+          0.75
+        ],
+        "source_seconds": [
+          1.3,
+          4.3
+        ],
+        "frame_range": null,
+        "hold": false,
+        "copy": "No additional copy. Existing hero content remains in normal flow.",
+        "focal_point": [
+          0.82,
+          0.5
+        ],
+        "camera": "Locked; light moves on the right. Mobile uses quieter crop, no heavy full-screen stage."
+      },
+      {
+        "id": "research",
+        "desktop": [
+          0.72,
+          1
+        ],
+        "mobile": [
+          0.75,
+          1
+        ],
+        "source_seconds": [
+          4.3,
+          6
+        ],
+        "frame_range": null,
+        "hold": false,
+        "copy": "Existing snapshot and research links enter naturally as hero leaves.",
+        "focal_point": [
+          0.82,
+          0.5
+        ],
+        "camera": "Locked, motion decelerates; no cut between independently generated scenes."
+      }
+    ],
+    "boundary_rule": "Half-open intervals [start,end), final interval inclusive at 1. Reverse scrolling uses the same mapping. Hold freezes an accepted frame; actual frame indexes remain null until extraction is verified."
+  },
+  "delivery_budgets": {
+    "status": "initial_targets_not_measurements",
+    "poster_transfer_bytes_max": 100000,
+    "mobile_sequence_transfer_bytes_max": 1500000,
+    "desktop_sequence_transfer_bytes_max": 3000000,
+    "extract_fps_start": 18,
+    "extract_width_max": 1280,
+    "concurrent_frame_requests": 3,
+    "decoded_frame_cache_desktop": 10,
+    "decoded_frame_cache_mobile": 6,
+    "dpr_max": 1.5,
+    "memory_note": "At 1280×720 RGBA, one decoded frame is about 3.52 MiB; ten are about 35.2 MiB. Compressed size does not measure decoded memory.",
+    "fallback": "Existing SVG and readable HTML, no sequence fetch for reduced motion, saved pause or Save-Data.",
+    "failure_policy": "Keep last useful frame or poster, cap retries, ignore stale responses, stop offscreen/hidden, release resources on teardown."
+  },
+  "acceptance": {
+    "generated_asset_review": "pending",
+    "seams": "One continuous clip per theme avoids cross-clip joins. Inspect all beats and full playback before extraction.",
+    "brand": "No generated logo, financial chart, market price or text. Original SVG unchanged.",
+    "data": "No financial data may appear in decorative media.",
+    "devices": [
+      {
+        "width": 1440,
+        "height": 900
+      },
+      {
+        "width": 768,
+        "height": 1024
+      },
+      {
+        "width": 390,
+        "height": 844
+      },
+      {
+        "width": 320,
+        "height": 720
+      },
+      {
+        "width": 844,
+        "height": 390
+      }
+    ],
+    "interaction": "Search, keyboard actions, native scrolling both directions, pause, reduced motion, Save-Data, resize, failed media, offscreen cleanup.",
+    "production": "Not deployed; no generation output exists."
+  }
+}

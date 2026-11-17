@@ -24,6 +24,25 @@ public sealed class ProviderTests
         Assert.Null(result.Industry);
     }
 
+    [Theory]
+    [InlineData("\"c\":0,\"t\":1700000000")]
+    [InlineData("\"c\":50,\"t\":0")]
+    [InlineData("\"c\":50,\"t\":253402300800")]
+    [InlineData("\"c\":null,\"t\":1700000000")]
+    public async Task ResearchDoesNotReportSuccessForRejectedQuotes(string quote)
+    {
+        using var handler = new FakeHandler(HttpStatusCode.OK,
+            "{\"ticker\":\"TEST\",\"name\":\"Test\",\"pc\":40," + quote + "}");
+        using var api = CreateApi(handler);
+        var result = await new ResearchService(api).StockAsync("TEST", default);
+        Assert.Equal("partial", result.State);
+        Assert.Equal("Quote data unavailable.", result.Message);
+        Assert.Null(result.Price);
+        Assert.Null(result.ChangePercent);
+        Assert.Null(result.Timestamp);
+        Assert.Equal("Test", result.Name);
+    }
+
     [Fact]
     public async Task ResearchRejectsInvalidProfileWithoutFetchingMoreData()
     {
@@ -44,7 +63,7 @@ public sealed class ProviderTests
         using var handler = new FakeHandler(HttpStatusCode.OK, body);
         using var api = CreateApi(handler);
         var store = new MarketStore();
-        var controller = new MarketDesk.Controllers.DataController(api, store);
+        var controller = new MarketDesk.Controllers.DataController(api);
         var action = Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(await controller.Stock("TEST", "profile", null, default));
         Assert.Equal("unavailable", Assert.IsType<ProviderResult>(action.Value).State);
         Assert.DoesNotContain("TEST", store.Symbols);

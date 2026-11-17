@@ -7,7 +7,7 @@ namespace MarketDesk.Controllers;
 
 [ApiController, Route("api/data"), EnableRateLimiting("read")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public sealed class DataController(FinnhubApi api, MarketStore store) : ControllerBase
+public sealed class DataController(FinnhubApi api, ResearchPreview? preview = null) : ControllerBase
 {
     [HttpGet("company-logo/{file}")]
     public async Task<IActionResult> Logo(string file, CancellationToken token)
@@ -45,6 +45,7 @@ public sealed class DataController(FinnhubApi api, MarketStore store) : Controll
             case "chart":
                 var days = range switch { "1D" => 1, "5D" => 5, "1M" => 31, "6M" => 183, "1Y" => 366, _ => 0 };
                 if (days == 0) return BadRequest(new { message = "Invalid chart range." });
+                if (preview?.AvailableFor(HttpContext) == true && preview.Chart(symbol, range!) is { } captured) return Ok(captured);
                 var end = DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 300 * 300;
                 var resolution = days <= 1 ? "5" : days <= 5 ? "30" : "D";
                 path = $"stock/candle?symbol={escaped}&resolution={resolution}&from={end - days * 86400L}&to={end}";
@@ -57,7 +58,6 @@ public sealed class DataController(FinnhubApi api, MarketStore store) : Controll
             if (result.Data is not { ValueKind: System.Text.Json.JsonValueKind.Object } profile ||
                 ReadText(profile, "ticker") != symbol)
                 return Ok(new ProviderResult("unavailable", "Company information is unavailable for this symbol."));
-            store.Ensure(symbol, ReadText(profile, "name") ?? symbol, ReadText(profile, "finnhubIndustry") ?? "");
         }
         return Ok(result);
     }

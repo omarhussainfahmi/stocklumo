@@ -8,13 +8,16 @@ public sealed record ProviderResult(string State, string Message, JsonElement? D
 public sealed record CompanyLogo(byte[] Bytes, string ContentType);
 
 // One bounded cache and request budget serve every browser and the background feed.
-public sealed class FinnhubApi(IHttpClientFactory clients, IConfiguration configuration) : IDisposable
+public sealed class FinnhubApi(IHttpClientFactory clients, IConfiguration configuration, TimeProvider? time = null,
+    ILogger<FinnhubApi>? logger = null) : IDisposable
 {
+    private readonly TimeProvider clock = time ?? TimeProvider.System;
+    private sealed record Cached<T>(T? Value, DateTimeOffset Expires) where T : class;
     private readonly MemoryCache cache = new(new MemoryCacheOptions { SizeLimit = 16 * 1024 * 1024 });
     private readonly SemaphoreSlim gate = new(1, 1);
     private readonly MemoryCache logoCache = new(new MemoryCacheOptions { SizeLimit = 8 * 1024 * 1024 });
     private readonly SemaphoreSlim logoGate = new(2, 2);
-    private DateTimeOffset window = DateTimeOffset.UtcNow;
+    private DateTimeOffset window = (time ?? TimeProvider.System).GetUtcNow();
     private DateTimeOffset blockedUntil;
     private int requests;
     public bool Configured => !string.IsNullOrWhiteSpace(configuration["Finnhub:ApiKey"]);
@@ -24,12 +27,12 @@ public sealed class FinnhubApi(IHttpClientFactory clients, IConfiguration config
         if (!Configured) return new("setup", "Connect a Finnhub API key on the server to load market information.");
         var key = configuration["Finnhub:ApiKey"]!;
         if (key.Length > 512 || key.Any(char.IsControl)) return new("error", "The server's Finnhub key configuration is invalid.");
-        if (cache.TryGetValue(path, out ProviderResult? cached) && cached is not null) return cached;
+        if (TryCached(cache, path, out ProviderResult? cached) && cached is not null) return cached;
         await gate.WaitAsync(token);
         try
         {
-            if (cache.TryGetValue(path, out cached) && cached is not null) return cached;
-            var now = DateTimeOffset.UtcNow;
+            if (TryCached(cache, path, out cached) && cached is not null) return cached;
+            var now = clock.GetUtcNow();
             if (now < blockedUntil) return new("limited", "The data provider is cooling down. Please try again shortly.");
             if (now - window >= TimeSpan.FromMinutes(1)) { window = now; requests = 0; }
             if (requests >= 45) return new("limited", "The shared data limit has been reached. Please retry in a minute.");
@@ -57,13 +60,15 @@ public sealed class FinnhubApi(IHttpClientFactory clients, IConfiguration config
                 var effectiveResponse = metadataResponse ?? response;
                 if (effectiveResponse.StatusCode == HttpStatusCode.TooManyRequests)
                 {
-                    var retry = effectiveResponse.Headers.RetryAfter?.Delta ?? TimeSpan.FromMinutes(1);
-                    blockedUntil = now + TimeSpan.FromSeconds(Math.Clamp(retry.TotalSeconds, 60, 300));
+                    var responseTime = clock.GetUtcNow();
+                    var retry = effectiveResponse.Headers.RetryAfter?.Delta ??
+                        (effectiveResponse.Headers.RetryAfter?.Date is { } date ? date - responseTime : TimeSpan.FromMinutes(1));
+                    blockedUntil = responseTime + TimeSpan.FromSeconds(Math.Clamp(retry.TotalSeconds, 60, 300));
                     result = new("limited", "Finnhub's request limit was reached. Updates will resume automatically.");
                 }
                 else if (effectiveResponse.StatusCode == HttpStatusCode.Unauthorized)
                 {
-                    blockedUntil = now + TimeSpan.FromMinutes(1);
+                    blockedUntil = clock.GetUtcNow() + TimeSpan.FromMinutes(1);
                     result = new("error", "Finnhub could not authorize this request. Check the server's API key.");
                 }
                 else if (effectiveResponse.StatusCode == HttpStatusCode.Forbidden) result = new("unavailable", "This information is unavailable under the current Finnhub access.");
@@ -78,11 +83,14 @@ public sealed class FinnhubApi(IHttpClientFactory clients, IConfiguration config
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
             catch (Exception ex) when (ex is HttpRequestException or JsonException or OperationCanceledException)
-            { result = new("error", "Market data could not be loaded. Please try again shortly."); }
+            {
+                logger?.LogWarning("Provider operation {Operation} failed ({FailureType}).", "market-data", ex.GetType().Name);
+                result = new("error", "Market data could not be loaded. Please try again shortly.");
+            }
             if (lifetime > TimeSpan.Zero || result.State != "ok")
             {
                 var size = 512 + path.Length * 2 + (result.Data?.GetRawText().Length ?? result.Message.Length) * 2;
-                cache.Set(path, result, new MemoryCacheEntryOptions { Size = size, AbsoluteExpirationRelativeToNow = result.State == "ok" ? lifetime : TimeSpan.FromSeconds(30) });
+                Remember(cache, path, result, result.State == "ok" ? lifetime : TimeSpan.FromSeconds(30), size);
             }
             return result;
         }
@@ -91,11 +99,11 @@ public sealed class FinnhubApi(IHttpClientFactory clients, IConfiguration config
     public async Task<CompanyLogo?> LogoAsync(string file, CancellationToken token)
     {
         if (file.Length > 120 || !System.Text.RegularExpressions.Regex.IsMatch(file, @"\A[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(png|jpe?g|webp)\z", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) return null;
-        if (logoCache.TryGetValue(file, out CompanyLogo? cached)) return cached;
+        if (TryCached(logoCache, file, out CompanyLogo? cached)) return cached;
         await logoGate.WaitAsync(token);
         try
         {
-            if (logoCache.TryGetValue(file, out cached)) return cached;
+            if (TryCached(logoCache, file, out cached)) return cached;
             CompanyLogo? result = null;
             try
             {
@@ -121,11 +129,23 @@ public sealed class FinnhubApi(IHttpClientFactory clients, IConfiguration config
                 }
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
-            catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException) { }
-            logoCache.Set(file, result, new MemoryCacheEntryOptions { Size = result?.Bytes.Length + 128 ?? 128, AbsoluteExpirationRelativeToNow = result is null ? TimeSpan.FromMinutes(5) : TimeSpan.FromHours(12) });
+            catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException)
+            { logger?.LogWarning("Provider operation {Operation} failed ({FailureType}).", "company-logo", ex.GetType().Name); }
+            Remember(logoCache, file, result, result is null ? TimeSpan.FromMinutes(5) : TimeSpan.FromHours(12), result?.Bytes.Length + 128 ?? 128);
             return result;
         }
         finally { logoGate.Release(); }
     }
+    private bool TryCached<T>(MemoryCache source, string key, out T? value) where T : class
+    {
+        if (source.TryGetValue(key, out Cached<T>? entry) && entry is not null && clock.GetUtcNow() < entry.Expires)
+        { value = entry.Value; return true; }
+        value = null;
+        return false;
+    }
+    private void Remember<T>(MemoryCache source, string key, T? value, TimeSpan lifetime, int size) where T : class =>
+        source.Set(key, new Cached<T>(value, clock.GetUtcNow() + lifetime),
+            new MemoryCacheEntryOptions { Size = size, AbsoluteExpirationRelativeToNow = lifetime });
+
     public void Dispose() { cache.Dispose(); gate.Dispose(); logoCache.Dispose(); logoGate.Dispose(); }
 }

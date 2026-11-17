@@ -20,6 +20,7 @@ public sealed class MarketStore
     private int subscriptionCount;
     private readonly Dictionary<string, int> viewers = new(StringComparer.Ordinal);
     public string[] ActiveSymbols { get { lock (gate) return viewers.Keys.ToArray(); } }
+    public bool Contains(string symbol) { lock (gate) return stocks.ContainsKey(symbol); }
     public void Ensure(string symbol, string name, string sector)
     {
         if (!StockSymbol.IsValid(symbol)) return;
@@ -62,13 +63,13 @@ public sealed class MarketStore
     public void ProviderMessage() { lock (gate) lastProviderMessageAt = DateTimeOffset.UtcNow; }
     public void SubscriptionCount(int count) { lock (gate) subscriptionCount = count; }
     public void SetStatus(string value, string detail) { lock (gate) { status = value; message = detail; } }
-    public void Quote(string symbol, decimal price, decimal previous, decimal open, decimal high, decimal low, long timestamp)
+    public void ApplyQuote(string symbol, decimal price, decimal previous, decimal open, decimal high, decimal low, DateTimeOffset timestamp)
     {
-        if (price <= 0 || timestamp <= 0 || timestamp > DateTimeOffset.UtcNow.AddMinutes(1).ToUnixTimeSeconds()) return;
+        if (price <= 0 || timestamp <= DateTimeOffset.UnixEpoch || timestamp > DateTimeOffset.UtcNow.AddMinutes(1)) return;
         lock (gate)
         {
             if (!stocks.TryGetValue(symbol, out var old)) return;
-            var time = DateTimeOffset.FromUnixTimeSeconds(timestamp);
+            var time = timestamp.ToUniversalTime();
             var newer = old.UpdatedAt is null || time > old.UpdatedAt || (time == old.UpdatedAt && old.Source != "Trade");
             stocks[symbol] = old with
             {
@@ -83,7 +84,7 @@ public sealed class MarketStore
             };
         }
     }
-    public bool QuoteState(string symbol, string state)
+    public bool UpdateQuoteState(string symbol, string state)
     {
         lock (gate)
         {
@@ -92,13 +93,13 @@ public sealed class MarketStore
             return true;
         }
     }
-    public void Trade(string symbol, decimal price, long timestamp)
+    public void ApplyTrade(string symbol, decimal price, DateTimeOffset timestamp)
     {
-        if (price <= 0 || timestamp <= 0 || timestamp > DateTimeOffset.UtcNow.AddMinutes(1).ToUnixTimeMilliseconds()) return;
+        if (price <= 0 || timestamp <= DateTimeOffset.UnixEpoch || timestamp > DateTimeOffset.UtcNow.AddMinutes(1)) return;
         lock (gate)
         {
             if (!stocks.TryGetValue(symbol, out var old)) return;
-            var time = DateTimeOffset.FromUnixTimeMilliseconds(timestamp);
+            var time = timestamp.ToUniversalTime();
             if (old.UpdatedAt > time) return;
             stocks[symbol] = old with { Price = price, UpdatedAt = time, Source = "Trade", TradeReceivedAt = DateTimeOffset.UtcNow };
         }

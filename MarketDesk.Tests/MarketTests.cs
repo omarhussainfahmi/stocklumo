@@ -74,7 +74,7 @@ public sealed class MarketTests
         Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(1700000000123), stock.UpdatedAt);
         Assert.NotNull(stock.TradeReceivedAt);
         Assert.NotNull(store.Snapshot().LastProviderMessageAt);
-        store.Quote("AAPL", 99, 10, 10, 10, 10, 253402300799);
+        store.ApplyQuote("AAPL", 99, 10, 10, 10, 10, DateTimeOffset.FromUnixTimeSeconds(253402300799));
         Assert.Equal(12m, store.Snapshot().Stocks[0].Price);
     }
 
@@ -82,10 +82,10 @@ public sealed class MarketTests
     public void QuoteErrorsRetainActualTimestampAndRecoverWithoutReplacingEqualTimeTrade()
     {
         var store = new MarketStore();
-        store.Trade("AAPL", 12, 1700000000000);
-        store.QuoteState("AAPL", "limited");
+        store.ApplyTrade("AAPL", 12, DateTimeOffset.FromUnixTimeMilliseconds(1700000000000));
+        store.UpdateQuoteState("AAPL", "limited");
         Assert.Equal("limited", store.Snapshot().Stocks[0].QuoteState);
-        store.Quote("AAPL", 11, 10, 10, 12, 10, 1700000000);
+        store.ApplyQuote("AAPL", 11, 10, 10, 12, 10, DateTimeOffset.FromUnixTimeSeconds(1700000000));
         Assert.Equal("ok", store.Snapshot().Stocks[0].QuoteState);
         Assert.Equal(12m, store.Snapshot().Stocks[0].Price);
         Assert.Equal("Trade", store.Snapshot().Stocks[0].Source);
@@ -137,8 +137,8 @@ public sealed class MarketTests
     public void LateQuotesCannotReplaceNewerTrades()
     {
         var store = new MarketStore();
-        store.Trade("AAPL", 210m, 1700000005000);
-        store.Quote("AAPL", 200m, 190m, 195m, 211m, 194m, 1700000000);
+        store.ApplyTrade("AAPL", 210m, DateTimeOffset.FromUnixTimeMilliseconds(1700000005000));
+        store.ApplyQuote("AAPL", 200m, 190m, 195m, 211m, 194m, DateTimeOffset.FromUnixTimeSeconds(1700000000));
         var stock = store.Snapshot().Stocks.Single(s => s.Symbol == "AAPL");
         Assert.Equal(210m, stock.Price);
         Assert.Equal(20m, stock.Change);
@@ -149,11 +149,11 @@ public sealed class MarketTests
     public void OutOfOrderOrInvalidTradesDoNotCorruptPrices()
     {
         var store = new MarketStore();
-        store.Trade("AAPL", 210m, 1700000005000);
-        store.Trade("AAPL", 190m, 1700000000000);
-        store.Trade("AAPL", -1m, 1700000006000);
-        store.Trade("AAPL", 500m, long.MaxValue);
-        store.Trade("UNSUPPORTED", 500m, 1700000006000);
+        store.ApplyTrade("AAPL", 210m, DateTimeOffset.FromUnixTimeMilliseconds(1700000005000));
+        store.ApplyTrade("AAPL", 190m, DateTimeOffset.FromUnixTimeMilliseconds(1700000000000));
+        store.ApplyTrade("AAPL", -1m, DateTimeOffset.FromUnixTimeMilliseconds(1700000006000));
+        store.ApplyTrade("AAPL", 500m, DateTimeOffset.MaxValue);
+        store.ApplyTrade("UNSUPPORTED", 500m, DateTimeOffset.FromUnixTimeMilliseconds(1700000006000));
         Assert.Equal(210m, store.Snapshot().Stocks[0].Price);
         Assert.Equal(8, store.Snapshot().Stocks.Length);
     }
@@ -162,7 +162,7 @@ public sealed class MarketTests
     public void MissingPreviousCloseDoesNotDivideByZero()
     {
         var store = new MarketStore();
-        store.Quote("AAPL", 100m, 0m, 99m, 101m, 98m, 1700000000);
+        store.ApplyQuote("AAPL", 100m, 0m, 99m, 101m, 98m, DateTimeOffset.FromUnixTimeSeconds(1700000000));
         Assert.Null(store.Snapshot().Stocks[0].ChangePercent);
     }
 
@@ -171,7 +171,7 @@ public sealed class MarketTests
     {
         var store = new MarketStore();
         var before = store.Snapshot();
-        store.Trade("AAPL", 100m, 1700000000000);
+        store.ApplyTrade("AAPL", 100m, DateTimeOffset.FromUnixTimeMilliseconds(1700000000000));
         Assert.Null(before.Stocks[0].Price);
         Assert.Equal(100m, store.Snapshot().Stocks[0].Price);
     }
@@ -192,7 +192,7 @@ public sealed class MarketTests
     {
         await using var app = CreateApp();
         using var client = app.CreateClient();
-        foreach (var path in new[] { "/", "/api/market", "/js/market.js", "/css/market.css" })
+        foreach (var path in new[] { "/", "/api/market", "/js/market/index.js", "/css/market.css" })
         {
             using var response = await client.GetAsync(path);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -201,6 +201,36 @@ public sealed class MarketTests
             var body = await response.Content.ReadAsStringAsync();
             Assert.DoesNotContain("ws.finnhub.io?token", body);
         }
+    }
+
+    [Fact]
+    public async Task UniverseWithoutProviderKeyIsExplicitAndNotCached()
+    {
+        await using var app = CreateApp();
+        using var client = app.CreateClient();
+        using var response = await client.GetAsync("/api/universe");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.Headers.CacheControl?.NoStore);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("unavailable", json.RootElement.GetProperty("state").GetString());
+        Assert.Contains("Finnhub", json.RootElement.GetProperty("message").GetString());
+        Assert.Equal(JsonValueKind.Null, json.RootElement.GetProperty("count").ValueKind);
+        Assert.Empty(json.RootElement.GetProperty("selection").EnumerateArray());
+    }
+
+    [Theory]
+    [InlineData("/api/research-preview/status")]
+    [InlineData("/api/research-preview/screener")]
+    [InlineData("/api/research-preview/financials/AAPL")]
+    [InlineData("/api/research-preview/chart/AAPL")]
+    [InlineData("/api/research-preview/earnings")]
+    public async Task PreviewEndpointsDoNotExposeCapturesWithoutExplicitEnablement(string path)
+    {
+        await using var app = CreateApp();
+        using var client = app.CreateClient();
+        using var response = await client.GetAsync(path);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.DoesNotContain("Longbridge", await response.Content.ReadAsStringAsync());
     }
 
     [Fact]
@@ -215,7 +245,7 @@ public sealed class MarketTests
         using var reader = new StreamReader(await response.Content.ReadAsStreamAsync(timeout.Token));
         var first = await reader.ReadLineAsync(timeout.Token);
         Assert.StartsWith("data: ", first);
-        app.Services.GetRequiredService<MarketStore>().Trade("AAPL", 123.45m, 1700000000000);
+        app.Services.GetRequiredService<MarketStore>().ApplyTrade("AAPL", 123.45m, DateTimeOffset.FromUnixTimeMilliseconds(1700000000000));
         while (true)
         {
             var line = await reader.ReadLineAsync(timeout.Token);

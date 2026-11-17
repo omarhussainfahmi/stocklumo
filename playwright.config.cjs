@@ -16,6 +16,7 @@ module.exports = defineConfig({
     { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'android-chromium', use: { ...devices['Pixel 7'] } },
     { name: 'iphone-webkit', use: { ...devices['iPhone 13'] } },
+    { name: 'desktop-webkit-layout', testMatch: '**/home-refinements.spec.cjs', grep: /summary cards stay centered/, use: { ...devices['Desktop Safari'] } },
   ],
   webServer: {
     command: `"${process.env.STOCKLUMO_DOTNET || 'dotnet'}" run --project MarketDesk --no-launch-profile --urls http://127.0.0.1:5161`,
@@ -23,6 +24,6 @@ module.exports = defineConfig({
     reuseExistingServer: false,
     timeout: 120000,
     // Explicitly override local User Secrets; browser fixtures never call Finnhub.
-    env: { ASPNETCORE_ENVIRONMENT: 'Development', Finnhub__ApiKey: ' ', Cloudflare__WebAnalyticsToken: ' ', Sentry__Enabled: 'false', RENDER: 'false' },
+    env: { ASPNETCORE_ENVIRONMENT: 'Development', Finnhub__ApiKey: ' ', Cloudflare__WebAnalyticsToken: ' ', Sentry__Enabled: 'false', RENDER: 'false', ResearchPreview__Enabled: 'false' },
   },
 });

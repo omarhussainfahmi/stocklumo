@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace MarketDesk.Controllers;
 
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public sealed class MarketController(MarketStore store) : Controller
+public sealed class MarketController(MarketStore store, CompanyRegistration registration) : Controller
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     [HttpGet("/")]
@@ -52,6 +52,12 @@ public sealed class MarketController(MarketStore store) : Controller
         var requested = symbols is null ? store.Symbols.Take(8).ToArray() : symbols.Split(',', StringSplitOptions.RemoveEmptyEntries).Distinct().ToArray();
         // Twenty saved stocks, one detail stock, eight spotlight and eight ticker symbols.
         if (requested.Length > 37 || requested.Any(s => !MarketDesk.Models.StockSymbol.IsValid(s))) { Response.StatusCode = 400; return; }
+        if (await registration.PrepareAsync(requested, token) is { } failure)
+        {
+            Response.StatusCode = failure.State switch { "invalid" => 400, "unavailable" => 404, "limited" => 429, _ => 503 };
+            await Response.WriteAsJsonAsync(new { message = failure.Message }, token);
+            return;
+        }
         using var subscription = store.Subscribe(requested);
         if (subscription is null) { Response.StatusCode = 429; return; }
         Response.ContentType = "text/event-stream";

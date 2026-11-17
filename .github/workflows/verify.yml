@@ -16,9 +16,12 @@ jobs:
           cache: npm
       - run: dotnet test MarketDesk.slnx -c Release
       - run: npm ci --ignore-scripts
+      - run: npm run lint
+      - run: npm run check:hero
       - run: npm test
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e
+      - run: npm run test:e2e:preview
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -26,6 +29,31 @@ jobs:
           path: |
             playwright-report/
             test-results/
+            output/financial-preview-tests/
           retention-days: 7
       - run: npm audit --audit-level=high
       - run: dotnet list MarketDesk.slnx package --vulnerable --include-transitive
+      - name: Build the runtime image with current vendor patches
+        timeout-minutes: 10
+        run: |
+          docker build --pull --tag stocklumo:verify .
+          docker save stocklumo:verify --output "$RUNNER_TEMP/stocklumo-image.tar"
+      - name: Check the runtime image for high and critical advisories
+        timeout-minutes: 10
+        run: |
+          mkdir -p "$RUNNER_TEMP/trivy-cache"
+          SCANNER=aquasec/trivy@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
+          # Download public advisory data without exposing the application image.
+          docker run --rm --mount "type=bind,source=$RUNNER_TEMP/trivy-cache,target=/cache" \
+            "$SCANNER" image --cache-dir /cache --download-db-only --no-progress
+          chmod -R a+rX "$RUNNER_TEMP/trivy-cache"
+          # Analyze the saved image offline, without a Docker socket or host credentials.
+          docker run --rm --network none --read-only --user 1000:1000 --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 96 --memory 1536m --memory-swap 1536m --cpus 2 --ulimit fsize=134217728:134217728 \
+            --tmpfs /scratch:rw,nosuid,size=1073741824,uid=1000,gid=1000 \
+            --mount "type=bind,source=$RUNNER_TEMP/trivy-cache,target=/cache,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/stocklumo-image.tar,target=/input/image.tar,readonly" \
+            --entrypoint /usr/bin/env "$SCANNER" -i PATH=/usr/local/bin:/usr/bin:/bin HOME=/scratch TMPDIR=/scratch \
+            timeout -s KILL 180 trivy image --cache-dir /cache --cache-backend memory \
+            --input /input/image.tar --skip-db-update --skip-java-db-update --offline-scan \
+            --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --no-progress

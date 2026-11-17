@@ -1,7 +1,7 @@
 const { readFileSync } = require("node:fs");
 module.exports = () => {
   let html = readFileSync("MarketDesk/Views/Market/Index.cshtml", "utf8");
-  for (const name of ["_SiteHeader", "_SiteFooter", "_PrivacyControls"]) {
+  for (const name of ["_SiteHeader", "_SiteFooter", "_PrivacyControls", "_ResearchNavigation"]) {
     html = html.replace(`<partial name="${name}" />`, readFileSync(`MarketDesk/Views/Shared/${name}.cshtml`, "utf8"));
   }
   // jsdom is not a Razor runtime. Resolve the mutually exclusive partial slots

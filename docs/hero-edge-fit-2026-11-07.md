@@ -1,0 +1,9 @@
+# Edge-to-edge video and raised content
+
+The desktop side gaps came from contain-fitting a 7:4 frame inside an independently tall hero. Desktop now uses a stage sized from viewport width at that source ratio, with a small responsive top inset that leaves room for the existing copy. Cover handles minor scrollbar/subpixel differences without stretching; center-bottom alignment protects the globe. The homepage shell's old 1920px cap is removed so the hero also spans ultrawide screens. Existing bounded market-content widths remain owned by their existing child rules. Mobile's slightly zoomed-out, full-source-height crop is unchanged.
+
+The second owner request during implementation was to lift the copy and expose actions on opening. Copy now aligns from the top, with height-responsive insets capped by the available video stage; short phones have a smaller inset. Words, font sizes, search, buttons, header, source video files, data and other routes were not changed.
+
+Verified desktop edges and source aspect ratio at 1110,1280,1440,1920,2560px; mobile at390px; both themes. Opening-fold checks verified search and both actions at1366×768,1440×900,1920×1080,390×844,360×800. Final six fit/fold browser tests passed across desktop Chromium, Android Chromium and iPhone WebKit. An earlier intermediate test caught the responsive copy forcing the 1110px stage too tall; capping the inset by stage width resolved it. Earlier six playback/shell checks passed before the copy-position adjustment; the final fit/fold rerun validates the finished placement. Build succeeded; source assets remain byte-identical and 60fps. No physical-device or universal screen-size claim is made.
+
+Changed runtime file: `wwwroot/css/hero.css`. Test updates: cover expectation in `hero-shell-refinement.spec.cjs` and new `hero-edge-fit.spec.cjs`. Evidence: `output/hero-edge-fit/`. Local only; not deployed.

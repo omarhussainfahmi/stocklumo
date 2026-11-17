@@ -1,50 +1,92 @@
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @model MarketDesk.Models.MarketSnapshot
-@{ Layout = null; var symbol = ViewData["Symbol"] as string ?? ""; var pageKind = symbol.Length > 0 ? "stock" : Context.Request.Path == "/" ? "home" : Context.Request.Path.Value?.TrimStart('/'); ViewData["HeaderSearch"] = pageKind != "home"; }
+@inject MarketDesk.Services.ResearchPreview ResearchPreview
+@{ Layout = null; var symbol = ViewData["Symbol"] as string ?? ""; var pageKind = symbol.Length > 0 ? "stock" : Context.Request.Path == "/" ? "home" : Context.Request.Path.Value?.TrimStart('/'); var isResearch = new[] { "screener", "compare", "portfolio", "earnings" }.Contains(pageKind); ViewData["HeaderSearch"] = pageKind != "home"; }
 <!doctype html>
 <html lang="en">
 <head>
     <partial name="_SiteHead" />
     <script asp-append-version="true" src="/js/research-math.js" defer></script>
-    <script asp-append-version="true" src="/js/market.js" defer></script>
+    <script asp-append-version="true" src="/js/market/format.js" defer></script>
+    <script asp-append-version="true" src="/js/market/api.js" defer></script>
+    <script asp-append-version="true" src="/js/market/company-marks.js" defer></script>
+    <script asp-append-version="true" src="/js/market/view.js" defer></script>
+    <script asp-append-version="true" src="/js/market/feed.js" defer></script>
+    <script asp-append-version="true" src="/js/market/stock-chart.js" defer></script>
+    <script asp-append-version="true" src="/js/market/search.js" defer></script>
+    <script asp-append-version="true" src="/js/market/discovery.js" defer></script>
+    <script asp-append-version="true" src="/js/market/index.js" defer></script>
     @if (new[] { "/screener", "/compare", "/portfolio", "/earnings" }.Contains(Context.Request.Path.Value))
     {
-        <script asp-append-version="true" src="/js/research.js" defer></script>
+        <script asp-append-version="true" src="/js/research/view.js" defer></script>
+        <script asp-append-version="true" src="/js/research/common.js" defer></script>
+        <script asp-append-version="true" src="@($"/js/research/{pageKind}.js")" defer></script>
     }
 </head>
 <body data-symbol="@symbol" data-page="@pageKind">
 <a class="skip" href="#main">Skip to content</a>
 <partial name="_SiteHeader" />
 <section class="ticker" aria-label="Live stock prices"><div id="ticker-stocks" class="ticker-stocks" tabindex="0" aria-label="Stock prices. Scroll horizontally for more stocks."><p>Loading live stock prices...</p></div></section>
-<main id="main" class="page">
-    <div class="workspace-toolbar">
-    <nav class="research-nav" aria-label="Research tools"><a href="/screener">Stock screener</a><a href="/compare">Compare stocks</a><a href="/portfolio">Virtual portfolio</a><a href="/earnings">Earnings calendar</a></nav>
+<div class="workspace-toolbar">
+    <partial name="_ResearchNavigation" />
     <div class="market-strip"><span id="market-status">US market status unavailable</span><span id="connection" role="status">SETUP</span><span>DATA / FINNHUB</span></div>
-    </div>
-    <section id="research" class="section" hidden aria-labelledby="research-title"><p class="eyebrow">RESEARCH DESK</p><h1 id="research-title"></h1><p id="research-description" class="muted"></p><details class="data-notes"><summary>About this data</summary><p id="research-notes"></p></details><div id="research-controls" class="research-controls"></div><p id="research-status" role="status"></p><div id="research-results"></div></section>
+</div>
+<main id="main" class="page">
+    @if (ResearchPreview.AvailableFor(Context))
+    {
+        <p id="research-preview-banner" class="notice preview-banner">Local research preview · Longbridge snapshot: @ResearchPreview.CaptureLabel. Ticker quotes: Finnhub. No automatic snapshot refresh.</p>
+    }
+    @if (isResearch)
+    {
+    <section id="research" class="section" hidden aria-labelledby="research-title">
+        <header class="research-heading">
+            <div>@if (isResearch) { <h1 id="research-title"></h1> } else { <h2 id="research-title"></h2> }<p id="research-description" class="muted"></p></div>
+            <button type="button" id="research-data-open" class="text-button data-info-trigger" aria-haspopup="dialog" aria-controls="research-data-dialog">About this data</button>
+        </header>
+        <dialog id="research-data-dialog" class="app-dialog research-data-dialog" aria-labelledby="research-data-title" aria-describedby="research-notes">
+            <header class="dialog-heading"><h2 id="research-data-title">About this data</h2><button type="button" id="research-data-close" autofocus>Close</button></header>
+            <p id="research-notes"></p>
+        </dialog>
+        <div id="research-controls" class="research-controls"></div><p id="research-status" role="status"></p><div id="research-results"></div>
+    </section>
+    <p id="notice" class="notice" role="status">@Model.Message</p>
+    }
+    else
+    {
     <section class="intro" aria-labelledby="page-title">
-        <div class="intro-copy"><p class="eyebrow">YOUR MARKET DESK</p><h1 id="page-title">Follow the market.<br /><em>Find your perspective.</em></h1>
-        <p id="intro-description" class="intro-description">Track prices. Explore companies. Follow what matters.</p>
+        @if (pageKind == "home")
+        {
+            <div id="hero-visual" class="hero-visual" aria-hidden="true" data-state="fallback">
+                <img class="hero-logo-light" asp-append-version="true" src="/media/hero/owner-light-poster.jpg" width="1890" height="1080" alt="" decoding="async" />
+                <img class="hero-logo-dark" asp-append-version="true" src="/media/hero/owner-dark-poster.jpg" width="1890" height="1080" alt="" decoding="async" />
+                <video id="hero-film" muted autoplay loop playsinline preload="none" aria-hidden="true" tabindex="-1"></video>
+            </div>
+        }
+        <div class="intro-copy">@if (symbol.Length == 0 && !isResearch) { <h1 id="page-title">Follow the market.<br />Find your perspective.</h1> } else { <h2 id="page-title"></h2> }
+        <p id="intro-description" class="intro-description">Prices and company research for the stocks you follow.</p>
         @if (pageKind == "home") { <partial name="_StockSearch" /> }
         <div id="intro-actions" class="intro-actions"><a class="button-link primary" href="/markets">Explore markets <span class="direction-icon direction-external" aria-hidden="true"></span></a><a class="button-link" href="/watchlist">Your watchlist <span class="direction-icon direction-right" aria-hidden="true"></span></a></div></div>
-        <aside id="market-pulse" class="market-pulse" hidden aria-labelledby="pulse-title"><div class="panel-heading"><span class="eyebrow">MARKET SNAPSHOT</span><span class="caption">vs previous close</span></div><h2 id="pulse-title">Selected stocks. One view.</h2><div id="pulse-breadth" class="selection-balance"></div><div id="pulse-bars" class="pulse-bars"><p class="muted">Waiting for quotes.</p></div><p class="caption">Selected stocks, not a market index. Shared % scale; timestamps below.</p></aside>
+        @if (pageKind == "home") { <button id="hero-film-toggle" class="hero-motion-control" type="button" hidden>Pause motion</button> }
+        <aside id="market-pulse" class="market-pulse" hidden aria-labelledby="pulse-title"><div class="panel-heading"><span>Market snapshot</span><span class="caption">vs previous close</span></div><h2 id="pulse-title">Selected stocks. One view.</h2><div id="pulse-breadth" class="selection-balance"></div><div id="pulse-bars" class="pulse-bars"><p class="muted">Waiting for quotes.</p></div><p class="caption">Selected stocks, not a market index. Shared % scale; timestamps below.</p></aside>
     </section>
-    <dl id="workspace-summary" class="workspace-summary" hidden><div><dt><svg class="summary-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17V9m6 8V4m6 13v-6m6 6H1" /></svg>Stock coverage</dt><dd id="summary-universe">-</dd><dd class="summary-note">US common stocks</dd></div><div><dt><svg class="summary-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v14H3zM7 9h10M7 13h6" /></svg>Spotlight quotes</dt><dd id="summary-quotes">-</dd><dd class="summary-note">Available / selected</dd></div><div><dt><svg class="summary-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h5l3-8 4 16 3-8h5" /></svg>Live spotlight trades</dt><dd id="summary-live">-</dd><dd class="summary-note">Fresh trades in this selection</dd></div><div><dt><svg class="summary-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V5l8-3v19m0-14h10v14M6 8h2m-2 4h2m7-1h2m-2 4h2" /></svg>US exchanges</dt><dd id="summary-exchanges">-</dd><dd class="summary-note">Nasdaq / NYSE / NYSE American</dd></div><div><dt><svg class="summary-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4Z" /></svg>Saved stocks</dt><dd id="summary-watch">-</dd><dd class="summary-note"><a href="/watchlist">Open watchlist <span class="direction-icon direction-right" aria-hidden="true"></span></a></dd></div><div><dt><svg class="summary-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6M3 3v6h6m3-3v6l4 2" /></svg>Recently viewed</dt><dd id="summary-recent">-</dd><dd class="summary-note">In this browser</dd></div></dl>
+    @if (pageKind == "home") { <h2 id="market-content" class="market-anchor" tabindex="-1">Market overview</h2> }
+    <dl id="workspace-summary" class="workspace-summary" hidden><div><dt><svg class="summary-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17V9m6 8V4m6 13v-6m6 6H1" /></svg>Stock coverage</dt><dd id="summary-universe">-</dd><dd class="summary-note">US common stocks</dd></div><div><dt><svg class="summary-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v14H3zM7 9h10M7 13h6" /></svg>Spotlight quotes</dt><dd id="summary-quotes">-</dd><dd class="summary-note">Available / selected</dd></div><div><dt><svg class="summary-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h5l3-8 4 16 3-8h5" /></svg>Avg. spotlight change</dt><dd id="summary-change">-</dd><dd id="summary-change-note" class="summary-note">vs previous close</dd></div><div><dt><svg class="summary-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V5l8-3v19m0-14h10v14M6 8h2m-2 4h2m7-1h2m-2 4h2" /></svg>US exchanges</dt><dd id="summary-exchanges">-</dd><dd class="summary-note">Nasdaq / NYSE / NYSE American</dd></div><div><dt><svg class="summary-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4Z" /></svg>Saved stocks</dt><dd id="summary-watch">-</dd><dd class="summary-note"><a href="/watchlist">Open watchlist <span class="direction-icon direction-right" aria-hidden="true"></span></a></dd></div><div><dt><svg class="summary-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6M3 3v6h6m3-3v6l4 2" /></svg>Recently viewed</dt><dd id="summary-recent">-</dd><dd class="summary-note">In this browser</dd></div></dl>
     <details id="universe-coverage" class="data-notes" hidden><summary>Stock coverage &amp; updates</summary><p id="universe-note">Loading stock coverage.</p><p>USD common stocks on Nasdaq, NYSE and NYSE American. Excludes OTC, funds and other security types. Coverage refreshes every 24 hours; quote access varies. Market-wide advances and declines are unavailable.</p></details>
     <p id="notice" class="notice" role="status">@Model.Message</p>
-    <section id="overview" class="section"><div class="section-title"><h2>Live stock spotlight</h2><span>DAILY US SELECTION</span></div><div id="spotlight" class="spotlight"><p class="muted">Loading stock prices...</p></div><p class="caption">Daily selection, not a ranking. Reload after 00:00 UTC for new picks. Check quote times.</p></section>
+    <section id="overview" class="section"><div class="section-title"><h2>Live stock spotlight</h2><span>Daily US selection</span></div><div id="spotlight" class="spotlight"><p class="muted">Loading stock prices...</p></div><p class="caption">Daily selection, not a ranking. New picks after 00:00 UTC on reload. Check quote times.</p></section>
     <article id="stock-detail" hidden>
         <a class="back" href="/"><span class="direction-icon direction-left" aria-hidden="true"></span> Dashboard</a>
-        <div class="stock-summary"><div class="stock-header"><span id="company-mark" hidden></span><div><div class="company-title"><h1 id="company">Loading company…</h1><p id="symbol" class="stock-symbol">@symbol</p></div><p id="exchange" class="muted"></p></div></div><button id="save-stock" type="button" disabled>Add to watchlist</button>
+        <div class="stock-summary"><div class="stock-header"><span id="company-mark" hidden></span><div><div class="company-title">@if (symbol.Length > 0) { <h1 id="company">Loading company…</h1> } else { <h2 id="company">Loading company…</h2> }<p id="symbol" class="stock-symbol">@symbol</p></div><p id="exchange" class="muted"></p></div></div><button id="save-stock" type="button" disabled>Add to watchlist</button>
         <div class="quote-summary"><div class="price-line"><span id="price">-</span><span id="currency"></span><p id="change">Waiting for a quote</p></div><p id="data-age" class="caption">No price received</p></div></div>
-        <div class="stock-analysis"><section class="section price-panel"><div class="section-title"><h2>Price history</h2><div id="ranges" class="ranges"><button type="button" data-range="session" aria-pressed="true">Session</button><button type="button" data-range="1D" hidden>1D</button><button type="button" data-range="5D" hidden>5D</button><button type="button" data-range="1M" hidden>1M</button><button type="button" data-range="6M" hidden>6M</button><button type="button" data-range="1Y" hidden>1Y</button></div></div>
+        <div class="stock-overview"><div class="stock-analysis"><section class="section price-panel"><div class="section-title"><h2>Price history</h2><div id="ranges" class="ranges"><button type="button" data-range="session" aria-pressed="true">Session</button><button type="button" data-range="1D" hidden>1D</button><button type="button" data-range="5D" hidden>5D</button><button type="button" data-range="1M" hidden>1M</button><button type="button" data-range="6M" hidden>6M</button><button type="button" data-range="1Y" hidden>1Y</button></div></div>
             <p id="chart-status" role="status" class="muted">Session observations start when a price arrives.</p>
-            <div class="plot"><svg id="chart" data-observations="0" viewBox="0 0 900 250" preserveAspectRatio="none" role="img" aria-label="Price history" tabindex="0"><defs><linearGradient id="price-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="currentColor" stop-opacity=".25" /><stop offset="100%" stop-color="currentColor" stop-opacity="0" /></linearGradient></defs><path id="chart-area" d="" /><path id="chart-line" d="" /><circle id="chart-point" r="3" hidden /><line id="cursor" x1="0" y1="15" x2="0" y2="220" hidden /></svg><div class="axis"><span id="chart-high">-</span><span id="chart-low">-</span></div></div>
+            <div id="captured-price-host" hidden></div>
+            <div class="plot"><div id="chart-observation" class="chart-observation"><strong id="observation-title">Waiting for a price</strong><p id="observation-description">The chart builds as prices arrive.</p></div><svg id="chart" data-observations="0" viewBox="0 0 900 250" preserveAspectRatio="none" role="img" aria-label="Price history" tabindex="0"><defs><linearGradient id="price-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="currentColor" stop-opacity=".25" /><stop offset="100%" stop-color="currentColor" stop-opacity="0" /></linearGradient></defs><g class="chart-grid" aria-hidden="true"><line x1="30" x2="870" y1="15" y2="15" /><line x1="30" x2="870" y1="66" y2="66" /><line x1="30" x2="870" y1="118" y2="118" /><line x1="30" x2="870" y1="169" y2="169" /><line x1="30" x2="870" y1="220" y2="220" /></g><path id="chart-area" d="" /><path id="chart-line" d="" /><circle id="chart-point" r="3" hidden /><line id="cursor" x1="0" y1="15" x2="0" y2="220" hidden /></svg><div class="axis"><span id="chart-high">-</span><span id="chart-low">-</span></div></div>
             <div class="chart-foot"><span id="chart-start">-</span><output id="chart-value">Hover or use arrow keys for prices.</output><span id="chart-end">-</span></div>
-            <p class="caption">Session: latest 120 observations from this visit. History depends on Finnhub access. Chart times are local.</p>
+            <p id="session-chart-note" class="caption">Session: latest 120 observations from this visit. History depends on Finnhub access. Chart times are local.</p>
         </section>
         </div>
-        <div class="stock-metrics"><dl id="stats" class="stats"></dl><aside id="price-ranges" class="range-panels" aria-label="Price ranges"></aside></div>
+        <div class="stock-metrics"><dl id="stats" class="stats"></dl><aside id="price-ranges" class="range-panels" aria-label="Price ranges"></aside></div></div>
         <div class="stock-context">
         @if (symbol.Length > 0) { <partial name="_Watchlist" /> }
         <section class="section company-panel"><div class="section-title"><h2>Company profile</h2><span>@symbol</span></div><p id="company-status" class="muted">Loading company information…</p><dl id="company-info" class="company-info"></dl></section>
@@ -53,19 +95,64 @@
     </article>
     @if (symbol.Length == 0) { <partial name="_Watchlist" /> }
     <section id="recent-section" class="section"><div class="section-title"><h2>Recently viewed</h2></div><div id="recent" class="chips"></div></section>
-    <section id="discover" class="section"><div class="section-title"><h2>Start exploring</h2><span>US COMPANIES · NOT RANKED</span></div><div id="explore-grid" class="chips explore-grid"><a href="/stock/AAPL"><strong>AAPL</strong><span>Apple</span></a><a href="/stock/MSFT"><strong>MSFT</strong><span>Microsoft</span></a><a href="/stock/NVDA"><strong>NVDA</strong><span>NVIDIA</span></a><a href="/stock/AMZN"><strong>AMZN</strong><span>Amazon</span></a><a href="/stock/GOOGL"><strong>GOOGL</strong><span>Alphabet</span></a><a href="/stock/META"><strong>META</strong><span>Meta</span></a><a href="/stock/TSLA"><strong>TSLA</strong><span>Tesla</span></a><a href="/stock/JPM"><strong>JPM</strong><span>JPMorgan Chase</span></a><a href="/stock/V"><strong>V</strong><span>Visa</span></a><a href="/stock/WMT"><strong>WMT</strong><span>Walmart</span></a><a href="/stock/XOM"><strong>XOM</strong><span>Exxon Mobil</span></a><a href="/stock/JNJ"><strong>JNJ</strong><span>Johnson & Johnson</span></a><a href="/stock/COST" class="explore-extra" hidden><strong>COST</strong><span>Costco</span></a><a href="/stock/NFLX" class="explore-extra" hidden><strong>NFLX</strong><span>Netflix</span></a><a href="/stock/AMD" class="explore-extra" hidden><strong>AMD</strong><span>AMD</span></a><a href="/stock/AVGO" class="explore-extra" hidden><strong>AVGO</strong><span>Broadcom</span></a><a href="/stock/KO" class="explore-extra" hidden><strong>KO</strong><span>Coca-Cola</span></a><a href="/stock/DIS" class="explore-extra" hidden><strong>DIS</strong><span>Disney</span></a><a href="/stock/HD" class="explore-extra" hidden><strong>HD</strong><span>Home Depot</span></a><a href="/stock/PG" class="explore-extra" hidden><strong>PG</strong><span>Procter & Gamble</span></a><a href="/stock/MA" class="explore-extra" hidden><strong>MA</strong><span>Mastercard</span></a><a href="/stock/BAC" class="explore-extra" hidden><strong>BAC</strong><span>Bank of America</span></a><a href="/stock/CRM" class="explore-extra" hidden><strong>CRM</strong><span>Salesforce</span></a><a href="/stock/ADBE" class="explore-extra" hidden><strong>ADBE</strong><span>Adobe</span></a></div><button id="more-stocks" type="button" aria-expanded="false" aria-controls="explore-grid">More stocks</button><p class="caption">Find more with stock search.</p></section>
-    <section id="toolkit" class="section" hidden aria-labelledby="toolkit-title"><div class="section-title"><h2 id="toolkit-title">From observation to research</h2><span>YOUR RESEARCH DESK</span></div><p class="muted">Explore, compare and track.</p><div class="tool-grid">
-        <a href="/screener"><span class="eyebrow">FILTER / DISCOVER</span><h3>Stock screener <span class="direction-icon direction-external" aria-hidden="true"></span></h3><p>Filter 12 US companies by price and fundamentals.</p><span class="tool-action">Find your shortlist <span class="direction-icon direction-right" aria-hidden="true"></span></span></a>
-        <a href="/compare"><span class="eyebrow">CONTEXT / COMPARE</span><h3>Compare stocks <span class="direction-icon direction-external" aria-hidden="true"></span></h3><p>Compare 2-5 companies and their performance.</p><span class="tool-action">Compare companies <span class="direction-icon direction-right" aria-hidden="true"></span></span></a>
-        <a href="/portfolio"><span class="eyebrow">PRACTICE / TRACK</span><h3>Virtual portfolio <span class="direction-icon direction-external" aria-hidden="true"></span></h3><p>Track practice holdings. No real trades.</p><span class="tool-action">Track holdings <span class="direction-icon direction-right" aria-hidden="true"></span></span></a>
-        <a href="/earnings"><span class="eyebrow">EVENTS / PLAN</span><h3>Earnings calendar <span class="direction-icon direction-external" aria-hidden="true"></span></h3><p>Upcoming dates, estimates and reported results.</p><span class="tool-action">Explore earnings <span class="direction-icon direction-right" aria-hidden="true"></span></span></a>
+    <section id="discover" class="section" aria-labelledby="discover-title">
+        <div class="section-title"><h2 id="discover-title">Start exploring</h2><span>USD price · highest first</span></div>
+        <p id="discover-status" class="caption" role="status">Loading prices. Ranking covers this company list only.</p>
+        <div id="explore-grid" class="chips explore-grid" aria-describedby="discover-status">
+            <a href="/stock/AAPL"><strong>AAPL</strong><span class="discovery-name">Apple</span></a>
+            <a href="/stock/MSFT"><strong>MSFT</strong><span class="discovery-name">Microsoft</span></a>
+            <a href="/stock/NVDA"><strong>NVDA</strong><span class="discovery-name">NVIDIA</span></a>
+            <a href="/stock/AMZN"><strong>AMZN</strong><span class="discovery-name">Amazon</span></a>
+            <a href="/stock/GOOGL"><strong>GOOGL</strong><span class="discovery-name">Alphabet</span></a>
+            <a href="/stock/META"><strong>META</strong><span class="discovery-name">Meta</span></a>
+            <a href="/stock/TSLA"><strong>TSLA</strong><span class="discovery-name">Tesla</span></a>
+            <a href="/stock/JPM"><strong>JPM</strong><span class="discovery-name">JPMorgan Chase</span></a>
+            <a href="/stock/V"><strong>V</strong><span class="discovery-name">Visa</span></a>
+            <a href="/stock/WMT"><strong>WMT</strong><span class="discovery-name">Walmart</span></a>
+            <a href="/stock/XOM"><strong>XOM</strong><span class="discovery-name">Exxon Mobil</span></a>
+            <a href="/stock/JNJ"><strong>JNJ</strong><span class="discovery-name">Johnson &amp; Johnson</span></a>
+            <a href="/stock/COST" class="explore-extra" hidden><strong>COST</strong><span class="discovery-name">Costco</span></a>
+            <a href="/stock/NFLX" class="explore-extra" hidden><strong>NFLX</strong><span class="discovery-name">Netflix</span></a>
+            <a href="/stock/AMD" class="explore-extra" hidden><strong>AMD</strong><span class="discovery-name">AMD</span></a>
+            <a href="/stock/AVGO" class="explore-extra" hidden><strong>AVGO</strong><span class="discovery-name">Broadcom</span></a>
+            <a href="/stock/KO" class="explore-extra" hidden><strong>KO</strong><span class="discovery-name">Coca-Cola</span></a>
+            <a href="/stock/DIS" class="explore-extra" hidden><strong>DIS</strong><span class="discovery-name">Disney</span></a>
+            <a href="/stock/HD" class="explore-extra" hidden><strong>HD</strong><span class="discovery-name">Home Depot</span></a>
+            <a href="/stock/PG" class="explore-extra" hidden><strong>PG</strong><span class="discovery-name">Procter &amp; Gamble</span></a>
+            <a href="/stock/MA" class="explore-extra" hidden><strong>MA</strong><span class="discovery-name">Mastercard</span></a>
+            <a href="/stock/BAC" class="explore-extra" hidden><strong>BAC</strong><span class="discovery-name">Bank of America</span></a>
+            <a href="/stock/CRM" class="explore-extra" hidden><strong>CRM</strong><span class="discovery-name">Salesforce</span></a>
+            <a href="/stock/ADBE" class="explore-extra" hidden><strong>ADBE</strong><span class="discovery-name">Adobe</span></a>
+            <a href="/stock/BRK.A" class="explore-extra" hidden><strong>BRK.A</strong><span class="discovery-name">Berkshire Hathaway</span></a>
+            <a href="/stock/BKNG" class="explore-extra" hidden><strong>BKNG</strong><span class="discovery-name">Booking Holdings</span></a>
+            <a href="/stock/NVR" class="explore-extra" hidden><strong>NVR</strong><span class="discovery-name">NVR</span></a>
+            <a href="/stock/AZO" class="explore-extra" hidden><strong>AZO</strong><span class="discovery-name">AutoZone</span></a>
+            <a href="/stock/FICO" class="explore-extra" hidden><strong>FICO</strong><span class="discovery-name">Fair Isaac</span></a>
+            <a href="/stock/ORLY" class="explore-extra" hidden><strong>ORLY</strong><span class="discovery-name">O'Reilly Automotive</span></a>
+            <a href="/stock/UNH" class="explore-extra" hidden><strong>UNH</strong><span class="discovery-name">UnitedHealth</span></a>
+            <a href="/stock/GS" class="explore-extra" hidden><strong>GS</strong><span class="discovery-name">Goldman Sachs</span></a>
+            <a href="/stock/LLY" class="explore-extra" hidden><strong>LLY</strong><span class="discovery-name">Eli Lilly</span></a>
+            <a href="/stock/TMO" class="explore-extra" hidden><strong>TMO</strong><span class="discovery-name">Thermo Fisher</span></a>
+            <a href="/stock/WFC" class="explore-extra" hidden><strong>WFC</strong><span class="discovery-name">Wells Fargo</span></a>
+            <a href="/stock/PEP" class="explore-extra" hidden><strong>PEP</strong><span class="discovery-name">PepsiCo</span></a>
+            <a href="/stock/ABBV" class="explore-extra" hidden><strong>ABBV</strong><span class="discovery-name">AbbVie</span></a>
+            <a href="/stock/CVX" class="explore-extra" hidden><strong>CVX</strong><span class="discovery-name">Chevron</span></a>
+            <a href="/stock/MCD" class="explore-extra" hidden><strong>MCD</strong><span class="discovery-name">McDonald's</span></a>
+            <a href="/stock/IBM" class="explore-extra" hidden><strong>IBM</strong><span class="discovery-name">IBM</span></a>
+        </div>
+        <div class="discovery-actions"><button id="more-stocks" type="button" aria-expanded="false" aria-controls="explore-grid">More stocks</button><button id="discovery-retry" type="button" hidden>Retry prices</button></div>
+    </section>
+    <section id="toolkit" class="section" hidden aria-labelledby="toolkit-title"><div class="section-title"><h2 id="toolkit-title">From observation to research</h2></div><div class="tool-grid">
+        <a href="/screener"><h3>Stock screener <span class="direction-icon direction-external" aria-hidden="true"></span></h3><p>Filter 12 US companies by price and fundamentals.</p></a>
+        <a href="/compare"><h3>Compare stocks <span class="direction-icon direction-external" aria-hidden="true"></span></h3><p>Compare 2–5 companies using quotes and fundamentals.</p></a>
+        <a href="/portfolio"><h3>Virtual portfolio <span class="direction-icon direction-external" aria-hidden="true"></span></h3><p>Track practice holdings. No real trades.</p></a>
+        <a href="/earnings"><h3>Earnings calendar <span class="direction-icon direction-external" aria-hidden="true"></span></h3><p>Upcoming dates, estimates and reported results.</p></a>
     </div></section>
-    <section id="news-section" class="section"><div class="section-title"><h2>Market news</h2><span>PUBLISHER REPORTS</span></div><div id="news"><p class="muted">Loading market news…</p></div></section>
+    <section id="news-section" class="section"><div class="section-title"><h2>@(pageKind == "news" ? "Latest reports" : "Market news")</h2><span>Publisher reports</span></div><div id="news"><p class="muted">Loading market news…</p></div></section>
+    }
     <noscript><p class="notice">Enable JavaScript for live prices, search, watchlists and charts.</p></noscript>
 </main>
 <a class="mobile-action" href="/markets">Explore markets<span class="direction-icon direction-right" aria-hidden="true"></span></a>
 <partial name="_SiteFooter" />
 </body>
 </html>
-
-

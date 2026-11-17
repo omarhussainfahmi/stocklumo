@@ -1,0 +1,85 @@
+const { test, expect, dismissPrivacy } = require('../support/fixtures.cjs');
+
+for (const theme of ['dark', 'light']) {
+  test(`company logos ${theme}: provider marks and failed images stay contained`, async ({ page }) => {
+    await page.addInitScript(theme => localStorage.setItem('stocklumo.theme', theme), theme);
+    await page.route('**/api/data/stock/JPM/profile', route => route.fulfill({ json: { state: 'ok', data: {
+      ticker: 'JPM', name: 'Fixture JPM', currency: 'USD', country: 'US', exchange: 'NYSE',
+      logo: 'https://static2.finnhub.io/file/publicdatany/finnhubimage/stock_logo/JPM.png'
+    } } }));
+    // A test-only image response; no real provider calls or market data.
+    await page.route('**/api/data/company-logo/JPM.png', route => route.fulfill({
+      contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><rect width="24" height="24" fill="#006b50"/></svg>'
+    }));
+    await page.goto('/stock/JPM');
+    await dismissPrivacy(page);
+    await expect(page.locator('#company-mark img')).toBeVisible();
+    await expect(page.locator('#company-mark img')).toHaveAttribute('src', '/api/data/company-logo/JPM.png');
+    await expect.poll(() => page.locator('#company-mark img').evaluate(image => image.naturalWidth)).toBeGreaterThan(0);
+    await page.locator('#company-mark img').evaluate(image => image.dispatchEvent(new Event('error')));
+    await expect(page.locator('#company-mark img')).toHaveCount(0);
+    await expect(page.locator('#company-mark .company-initials')).toBeVisible();
+    await expect(page.locator('#company-mark')).toContainText('JPM');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    for (const symbol of ['TSLA', 'V']) {
+      await page.goto(`/stock/${symbol}`);
+      await expect.poll(() => page.locator('#company-mark img').evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
+    }
+  });
+  test(`observatory ${theme}: header search, company context and chart retain usable geometry`, async ({ page, isMobile }, testInfo) => {
+    if (!isMobile) await page.setViewportSize({ width: 1487, height: 1058 });
+    await page.addInitScript(theme => localStorage.setItem('stocklumo.theme', theme), theme);
+    // Hold the synthetic quote time steady: this case specifically exercises
+    // a single observation, including repeated requests across a clock second.
+    const quoteTime = Math.floor(Date.now() / 1000);
+    await page.route('**/api/data/stock/AAPL/quote', route => route.fulfill({ json: {
+      state: 'ok', data: { c: 120, pc: 118, o: 119, h: 125, l: 115, t: quoteTime }
+    } }));
+    await page.goto('/stock/AAPL');
+    await dismissPrivacy(page);
+    await expect(page.locator('#company')).toHaveText('Fixture AAPL');
+    await expect(page.locator('#price')).toHaveText('120.00');
+    await expect(page.locator('#search')).toHaveCount(1);
+    await expect(page.locator('.header #search')).toBeVisible();
+    await expect(page.locator('#watch-section')).toHaveCount(1);
+    await expect(page.locator('.brand img').first()).toHaveAttribute('src', /\/images\/stocklumo-mark\.svg/);
+    await expect(page.locator('#company-mark img')).toHaveAttribute('src', /\/images\/icons\/apple\.svg$/);
+    await expect.poll(() => page.locator('#company-mark img').evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
+    await expect(page.locator('#chart-status')).toContainText('History unavailable');
+    await expect(page.locator('#chart-observation')).toBeVisible();
+    await expect(page.locator('#chart-point')).toHaveAttribute('cx', '450');
+    await page.locator('#chart').focus();
+    await page.keyboard.press('ArrowRight');
+    // One observation is a quote, not a trend: do not display a chart cursor.
+    await expect(page.locator('#cursor')).toHaveAttribute('hidden', '');
+    await expect(page.locator('#chart-single-quote')).toBeVisible();
+    await expect(page.locator('#single-quote-price')).toContainText('120.00 USD');
+    await expect(page.locator('#chart-value')).toContainText('120.00 USD');
+    await expect(page.locator('[data-range]:visible')).toHaveCount(1);
+    await expect(page.locator('.range-card svg')).toHaveCount(2);
+    await page.getByRole('button', { name: 'Add to watchlist', exact: true }).click();
+    await expect(page.locator('.stock-context #watch-rows')).toContainText('AAPL');
+    const geometry = await page.evaluate(async () => {
+      await document.fonts.ready;
+      const box = selector => document.querySelector(selector).getBoundingClientRect().toJSON();
+      return { main: box('main'), chart: box('.price-panel'), watch: box('#watch-section'), profile: box('.company-panel'),
+        contained: document.documentElement.scrollWidth <= innerWidth + 1,
+        fontLoaded: [...document.fonts].some(font => font.family.includes('Manrope') && font.status === 'loaded') };
+    });
+    expect(geometry.contained).toBe(true);
+    expect(geometry.fontLoaded).toBe(true);
+    if (isMobile) expect(geometry.chart.width / geometry.main.width).toBeGreaterThan(0.85);
+    else {
+      expect(geometry.chart.width / geometry.main.width).toBeGreaterThan(0.45);
+      expect(geometry.chart.width / geometry.main.width).toBeLessThan(0.7);
+    }
+    if (isMobile) expect(geometry.profile.y).toBeGreaterThan(geometry.watch.y);
+    else {
+      expect(Math.abs(geometry.profile.y - geometry.watch.y)).toBeLessThan(2);
+      expect(geometry.chart.y).toBeLessThan(450);
+    }
+    const screenshot = testInfo.outputPath(`observatory-${theme}.png`);
+    await page.screenshot({ path: screenshot, fullPage: false });
+    await testInfo.attach('Synthetic fixture layout preview', { path: screenshot, contentType: 'image/png' });
+  });
+}

@@ -1,12 +1,23 @@
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 <footer class="footer">
+    <div class="footer-inner">
+    <section class="footer-invitation" aria-labelledby="footer-invitation-title">
+        <div><h2 id="footer-invitation-title">Keep your research moving.</h2><p>Explore companies. Find your perspective.</p></div>
+        <a class="button-link primary" href="/markets">Explore markets <span class="direction-icon direction-right" aria-hidden="true"></span></a>
+    </section>
     <div class="footer-main">
-        <div class="footer-about"><a class="brand" href="/"><img asp-append-version="true" src="/images/stocklumo-mark.svg" width="32" height="32" alt="" />Stocklumo</a><p>Your personal market desk. Built by Omar Hussain Fahmi.</p></div>
+        <div class="footer-about"><a class="brand" href="/"><img asp-append-version="true" src="/images/stocklumo-mark.svg" width="32" height="40" alt="" />Stocklumo</a><p>Your personal market desk.</p><p class="footer-credit">Built by Omar Hussain Fahmi.</p></div>
+        <div class="footer-middle">
         <nav aria-label="Footer navigation"><h2>Explore</h2><a href="/">Dashboard</a><a href="/markets">Markets</a><a href="/watchlist">Watchlist</a><a href="/news">News</a></nav>
-        <div class="footer-contact"><h2>Get in touch</h2><a href="mailto:omarhussainfahmi@hotmail.com">omarhussainfahmi@hotmail.com</a><a class="contact-button" href="https://www.linkedin.com/in/omar-hussain-fahmi-830b62256" target="_blank" rel="noopener noreferrer">LinkedIn <span class="direction-icon direction-external" aria-hidden="true"></span></a></div>
+        <nav aria-label="Footer research tools"><h2>Research</h2><a href="/screener">Stock screener</a><a href="/compare">Compare stocks</a><a href="/portfolio">Virtual portfolio</a><a href="/earnings">Earnings calendar</a></nav>
+        <nav aria-label="Footer social media"><h2>Social media</h2><a href="https://www.linkedin.com/in/omar-hussain-fahmi-830b62256" target="_blank" rel="noopener noreferrer">LinkedIn <span class="direction-icon direction-external" aria-hidden="true"></span></a><a href="https://www.instagram.com/gorgeous.omar/" target="_blank" rel="noopener noreferrer">Instagram <span class="direction-icon direction-external" aria-hidden="true"></span></a><a href="https://wa.me/966500411051" target="_blank" rel="noopener noreferrer">WhatsApp <span class="direction-icon direction-external" aria-hidden="true"></span></a></nav>
+        </div>
+        <div class="footer-contact"><h2>Get in touch</h2><a class="footer-email" href="mailto:omarhussainfahmi@hotmail.com">omarhussainfahmi@hotmail.com</a><a class="footer-phone" href="tel:+966500411051">+966 50 041 1051</a></div>
     </div>
     <div class="footer-notes"><p>Market data by <a href="https://finnhub.io/" target="_blank" rel="noopener noreferrer">Finnhub <span class="direction-icon direction-external" aria-hidden="true"></span></a>. Coverage and delays vary. For information only, not investment advice.</p><p>Watchlist, recent stocks and settings stay in this browser.</p></div>
-    <nav class="footer-legal" aria-label="Site information"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/settings">Privacy &amp; backups</a><button type="button" class="text-button" data-privacy-open>Cookie settings</button></nav>
+    <nav class="footer-legal" aria-label="Site information"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/settings">Privacy &amp; backups</a><button type="button" class="text-button" data-privacy-open>Cookie settings</button><button type="button" class="text-button" data-background-motion aria-pressed="false" hidden>Pause background motion</button></nav>
     <div class="footer-bottom"><span>© @DateTime.UtcNow.Year Stocklumo</span><a href="#main">Back to top <span class="direction-icon direction-up" aria-hidden="true"></span></a></div>
+    <div class="footer-signature" aria-hidden="true">Stocklumo</div>
+    </div>
 </footer>
 <partial name="_PrivacyControls" />

@@ -1,8 +1,12 @@
+> Code cleanup completed locally, 17 November 2026: 150 backend, 97 JavaScript and 63 focused browser checks passed, plus lint and local Release publish smoke. See [cleanup details and limits](docs/code-cleanup-2026-11-17.md). Not deployed. Stopped before Branch protection pending the user's next instruction.
+
+> Local maintenance, 17 November 2026: all 108 iPhone/WebKit cases have been checked across bounded batches and focused rechecks (105 passes, three existing desktop-only skips). Earlier failed attempts and the unexplained intermittent native-browser abort are preserved in the audit reports. Prior backend (150), JavaScript (97), captured-preview (24) and production smoke results remain dated verification; runtime code did not change during this browser continuation. Changes are local and have not been deployed. Earlier release results below describe their dated revisions.
+
 # Stocklumo
 
 Frontend update (22 October 2026): the approved Market Observatory direction introduces navy/mint and slate light themes, locally hosted Manrope typography, header search, a full-width stock chart, compact range displays and adjacent watchlist/company panels. Original logo assets, routes, provider behavior and browser-local data are preserved. Illustrative candles and indicators from the design reference are not substituted for unavailable provider data. See [DESIGN.md](DESIGN.md) and [design QA](design-qa.md) for the design rules, tests and limitations.
 
-Latest release (22 October 2026): commit `f94be65` is deployed and verified on Render Free. Release build: zero warnings/errors; 100 backend tests, 55 frontend tests and 120 desktop/phone browser checks passed locally; GitHub CI also passed for the deployed commit. Production quotes, timestamps and the session chart were observed updating from genuine Finnhub trades. Optional server-side Sentry remains enabled with sensitive fields removed. See [design QA](design-qa.md) for current evidence and limitations. Earlier dated sections below describe historical releases.
+Historical verified release (22 October 2026): commit `f94be65` is deployed and verified on Render Free. Release build: zero warnings/errors; 100 backend tests, 55 frontend tests and 120 desktop/phone browser checks passed locally; GitHub CI also passed for the deployed commit. Production quotes, timestamps and the session chart were observed updating from genuine Finnhub trades. Optional server-side Sentry remains enabled with sensitive fields removed. See [design QA](design-qa.md) for current evidence and limitations. Earlier dated sections below describe historical releases.
 
 Stocklumo is an ASP.NET Core 10 MVC stock-tracking application powered by Finnhub. It combines an editorial financial interface with live prices, company pages, a browser-local watchlist and source-linked news.
 
@@ -13,7 +17,7 @@ Captured from the running application on 8 October 2026. Prices in the screensho
 ## Features
 
 - Dashboard, Markets, Watchlist and News routes, plus `/stock/AAPL` style company pages.
-- Fixed eight-stock ticker (AAPL, MSFT, AMZN, GOOGL, META, TSLA, V, NVDA) on every page, separate from the daily provider-selected spotlight, with timestamps and shared subscriptions. Twelve exploration links expand to twenty-four. The connection pulse respects reduced-motion settings.
+- Fixed eight-stock ticker (AAPL, MSFT, AMZN, GOOGL, META, TSLA, V, NVDA) on every page, separate from the daily provider-selected spotlight, with timestamps and shared subscriptions. Twelve exploration links expand to forty. The connection pulse respects reduced-motion settings.
 - Debounced company/symbol lookup with cancellation and keyboard-accessible results.
 - Quote prices, previous-close changes, available daily statistics and company profiles.
 - Shared server-side WebSocket feed with subscription reference counts, unsubscribe, idle disconnect, reconnection, bounded messages and shutdown cancellation.
@@ -36,7 +40,13 @@ The app never substitutes invented prices, news or company profiles. Starter com
 
 ## Stack and structure
 
-C#, ASP.NET Core 10 MVC, Razor, HTML, CSS, plain JavaScript, xUnit and ASP.NET Core TestHost. Node, jsdom, Playwright and axe are used **only for frontend tests**, not to run the website. The optional server-side Sentry integration sends minimal error reports only when explicitly enabled.
+C#, ASP.NET Core 10 MVC, Razor, HTML, CSS, plain JavaScript, xUnit and ASP.NET Core TestHost. The website runs on .NET; Node is development tooling, not a production web server. jsdom, Playwright and axe support frontend tests. Optional asset-authoring tools also use Node, esbuild, Three.js, GSAP and Playwright. The optional server-side Sentry integration sends minimal error reports only when explicitly enabled.
+
+### Hero assets and authoring
+
+The current homepage plays the owner's theme-specific videos, `MarketDesk/wwwroot/media/hero/owner-dark-60fps.mp4` and `owner-light-60fps.mp4`, with static posters and reduced-motion fallbacks. Preserve these original video files; the authoring commands below do not regenerate them.
+
+`npm run build:hero` bundles the earlier editable WebGL implementation from `frontend/hero-scene.js` through `tools/build-hero.cjs`; `npm run check:hero` verifies that bundle matches its source. `tools/render-hero-film.cjs <path-to-ffmpeg.exe>` renders the earlier procedural film and posters using Playwright and FFmpeg. These are optional authoring workflows for archived alternatives, not prerequisites for running the current homepage. See `DESIGN.md` and `docs/hero-film-2026-11-05.md` for the active composition and earlier film's production details.
 
 - `MarketDesk/Program.cs` registers services and configures middleware, security headers, HTTPS and rate limits.
 - `MarketDesk/Controllers/MarketController.cs` serves pages and the browser event stream.
@@ -71,9 +81,11 @@ Get a key from https://finnhub.io/. Never paste the real key into Git, JavaScrip
 ```powershell
 dotnet test MarketDesk.slnx -c Release
 npm ci --ignore-scripts
+npm run lint
 npm test
 npx playwright install chromium webkit
 npm run test:e2e
+npm run test:e2e:preview
 dotnet list MarketDesk.slnx package --vulnerable --include-transitive
 npm audit
 ```

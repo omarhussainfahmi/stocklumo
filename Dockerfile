@@ -6,6 +6,9 @@ COPY MarketDesk/ MarketDesk/
 RUN dotnet publish MarketDesk/MarketDesk.csproj -c Release --no-restore -o /app/publish /p:UseAppHost=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+# Apply available distribution security fixes before dropping root privileges.
+USER root
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app/publish .
 ENV ASPNETCORE_HTTP_PORTS=10000

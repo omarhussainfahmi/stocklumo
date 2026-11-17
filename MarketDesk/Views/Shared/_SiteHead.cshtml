@@ -1,5 +1,7 @@
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@inject MarketDesk.Services.ResearchPreview ResearchPreview
+@inject Microsoft.AspNetCore.Mvc.ViewFeatures.IFileVersionProvider FileVersions
 @{
     var meta = MarketDesk.Models.SitePage.ForPath(Context.Request.Path.Value ?? "/", Context.Response.StatusCode);
     var title = meta.Title + " | Stocklumo";
@@ -7,7 +9,7 @@
     var analytics = System.Text.RegularExpressions.Regex.IsMatch(token, "\\A[a-f0-9]{32}\\z");
 }
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>@title</title>
 <meta name="description" content="@meta.Description" />
 @if (meta.NoIndex) { <meta name="robots" content="noindex, follow" /> }
@@ -27,9 +29,28 @@ else { <link rel="canonical" href="@(MarketDesk.Models.SitePage.Origin + meta.Pa
 <meta name="twitter:image" content="@(MarketDesk.Models.SitePage.Origin)/images/stocklumo-share.png" />
 <meta name="twitter:image:alt" content="Stocklumo - your personal market desk." />
 <meta name="theme-color" content="#0d202c" />
+<script asp-append-version="true" src="/js/theme-init.js"></script>
 @if (analytics) { <meta name="stocklumo-analytics" content="@token" /> }
 <link asp-append-version="true" rel="icon" type="image/svg+xml" href="/images/stocklumo-icon.svg" />
 <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png" />
 <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png" />
 <link asp-append-version="true" rel="stylesheet" href="/css/market.css" />
+<link asp-append-version="true" rel="stylesheet" href="/css/observatory.css" />
+<link asp-append-version="true" rel="stylesheet" href="/css/motion.css" />
+<link asp-append-version="true" rel="stylesheet" href="/css/glass.css" />
+<link asp-append-version="true" rel="stylesheet" href="/css/search.css" />
 <script asp-append-version="true" src="/js/site.js" defer></script>
+<script asp-append-version="true" src="/js/motion.js" defer></script>
+<script asp-append-version="true" src="/js/atmosphere.js" defer></script>
+@if (Context.Request.Path == "/")
+{
+    <link asp-append-version="true" rel="stylesheet" href="/css/hero.css" />
+    <script asp-append-version="true" src="/js/hero/video.js" defer></script>
+}
+@if (ResearchPreview.AvailableFor(Context))
+{
+    <script asp-append-version="true" src="/js/research/preview-series.js" defer></script>
+    <script asp-append-version="true" src="/js/research/preview-format.js" defer></script>
+    <script asp-append-version="true" src="/js/research/preview-chart.js" defer></script>
+    <script asp-append-version="true" src="/js/research/preview.js" defer></script>
+}

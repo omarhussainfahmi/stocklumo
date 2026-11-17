@@ -4,8 +4,11 @@ using System.Text.Json;
 namespace MarketDesk.Services;
 
 public sealed class FinnhubFeed(MarketStore store, FinnhubApi api, IConfiguration configuration,
-    ILogger<FinnhubFeed> logger) : BackgroundService
+    ILogger<FinnhubFeed> logger, MarketSocketFactory? sockets = null, TimeProvider? time = null) : BackgroundService
 {
+    private readonly MarketSocketFactory connections = sockets ?? new MarketSocketFactory();
+    private readonly TimeProvider clock = time ?? TimeProvider.System;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var key = configuration["Finnhub:ApiKey"];
@@ -27,7 +30,7 @@ public sealed class FinnhubFeed(MarketStore store, FinnhubApi api, IConfiguratio
                 var result = await api.GetAsync("quote?symbol=" + Uri.EscapeDataString(symbol), TimeSpan.FromSeconds(60), token);
                 if (result.Data is not { } data)
                 {
-                    if (store.QuoteState(symbol, result.State))
+                    if (store.UpdateQuoteState(symbol, result.State))
                         logger.LogWarning("Quote refresh failed for {Symbol} ({State}).", symbol, result.State);
                     continue;
                 }
@@ -35,12 +38,12 @@ public sealed class FinnhubFeed(MarketStore store, FinnhubApi api, IConfiguratio
                 {
                     var quote = data.Deserialize<QuoteResponse>();
                     if (quote is not null && quote.c > 0 && quote.t > 0 && quote.t <= DateTimeOffset.UtcNow.AddMinutes(1).ToUnixTimeSeconds())
-                        store.Quote(symbol, quote.c, quote.pc, quote.o, quote.h, quote.l, quote.t);
-                    else store.QuoteState(symbol, "unavailable");
+                        store.ApplyQuote(symbol, quote.c, quote.pc, quote.o, quote.h, quote.l, DateTimeOffset.FromUnixTimeSeconds(quote.t));
+                    else store.UpdateQuoteState(symbol, "unavailable");
                 }
-                catch (JsonException) { store.QuoteState(symbol, "error"); logger.LogWarning("Invalid quote payload."); }
+                catch (JsonException) { store.UpdateQuoteState(symbol, "error"); logger.LogWarning("Invalid quote payload."); }
             }
-            await Task.Delay(TimeSpan.FromSeconds(5), token);
+            await Task.Delay(TimeSpan.FromSeconds(5), clock, token);
         }
     }
     private async Task StreamAsync(string key, CancellationToken token)
@@ -51,27 +54,20 @@ public sealed class FinnhubFeed(MarketStore store, FinnhubApi api, IConfiguratio
             if (store.ActiveSymbols.Length == 0)
             {
                 store.SetStatus("idle", "Select a stock to connect to the market feed.");
-                await Task.Delay(TimeSpan.FromSeconds(1), token);
+                await Task.Delay(TimeSpan.FromSeconds(1), clock, token);
                 continue;
             }
             var failureState = "disconnected";
             try
             {
                 store.SetStatus("connecting", "Connecting to Finnhub. Quotes may be available while the stream connects.");
-                using var socket = new ClientWebSocket();
-                socket.Options.KeepAliveInterval = TimeSpan.FromSeconds(20);
-                socket.Options.KeepAliveTimeout = TimeSpan.FromSeconds(20);
-                using (var connectionTimeout = CancellationTokenSource.CreateLinkedTokenSource(token))
-                {
-                    connectionTimeout.CancelAfter(TimeSpan.FromSeconds(15));
-                    await socket.ConnectAsync(new Uri("wss://ws.finnhub.io?token=" + Uri.EscapeDataString(key)), connectionTimeout.Token);
-                }
+                using var socket = await connections.OpenAsync(key, token);
                 using var session = CancellationTokenSource.CreateLinkedTokenSource(token);
                 var subscriptions = SynchronizeAsync(socket, session);
                 try
                 {
                     store.SetStatus("connected", "Upstream socket connected. Waiting for qualifying market data; connection health does not establish quote freshness.");
-                    var connectedAt = DateTimeOffset.UtcNow;
+                    var connectedAt = clock.GetUtcNow();
                     var buffer = new byte[8192];
                     while (socket.State == WebSocketState.Open)
                     {
@@ -86,7 +82,7 @@ public sealed class FinnhubFeed(MarketStore store, FinnhubApi api, IConfiguratio
                         } while (!part.EndOfMessage);
                         if (part.MessageType != WebSocketMessageType.Text) continue;
                         ApplyMessage(message.ToArray(), store);
-                        if (DateTimeOffset.UtcNow - connectedAt > TimeSpan.FromMinutes(1)) delay = 2;
+                        if (clock.GetUtcNow() - connectedAt > TimeSpan.FromMinutes(1)) delay = 2;
                     }
                 }
                 finally
@@ -102,9 +98,9 @@ public sealed class FinnhubFeed(MarketStore store, FinnhubApi api, IConfiguratio
                 if (ex is InvalidDataException or JsonException) failureState = "error";
                 logger.LogWarning("Market stream interrupted ({FailureType}).", ex.GetType().Name);
             }
-            store.SubscriptionCount(0);
+            finally { store.SubscriptionCount(0); }
             store.SetStatus(failureState, "Stream unavailable. Retrying automatically; check the API key and Finnhub access if this persists.");
-            await Task.Delay(TimeSpan.FromSeconds(delay) + TimeSpan.FromMilliseconds(Random.Shared.Next(500)), token);
+            await Task.Delay(TimeSpan.FromSeconds(delay) + TimeSpan.FromMilliseconds(Random.Shared.Next(500)), clock, token);
             delay = Math.Min(delay * 2, 60);
         }
     }
@@ -128,7 +124,7 @@ public sealed class FinnhubFeed(MarketStore store, FinnhubApi api, IConfiguratio
                 }
                 store.SubscriptionCount(subscribed.Count);
                 if (desired.Count == 0) return;
-                await Task.Delay(TimeSpan.FromSeconds(1), session.Token);
+                await Task.Delay(TimeSpan.FromSeconds(1), clock, session.Token);
             }
         }
         finally { await session.CancelAsync(); }
@@ -148,7 +144,8 @@ public sealed class FinnhubFeed(MarketStore store, FinnhubApi api, IConfiguratio
                 !trade.TryGetProperty("s", out var symbol) || symbol.ValueKind != JsonValueKind.String ||
                 !trade.TryGetProperty("p", out var price) || price.ValueKind != JsonValueKind.Number || !price.TryGetDecimal(out var value) ||
                 !trade.TryGetProperty("t", out var time) || time.ValueKind != JsonValueKind.Number || !time.TryGetInt64(out var timestamp)) continue;
-            store.Trade(symbol.GetString() ?? "", value, timestamp);
+            if (timestamp <= 0 || timestamp > DateTimeOffset.UtcNow.AddMinutes(1).ToUnixTimeMilliseconds()) continue;
+            store.ApplyTrade(symbol.GetString() ?? "", value, DateTimeOffset.FromUnixTimeMilliseconds(timestamp));
         }
     }
 
