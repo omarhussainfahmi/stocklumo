@@ -47,7 +47,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/trivy-cache"
           SCANNER=aquasec/trivy@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
           # Download public advisory data without exposing the application image.
-          docker run --rm --mount "type=bind,source=$RUNNER_TEMP/trivy-cache,target=/cache" \
+          docker run --rm --user "$(id -u):$(id -g)" --mount "type=bind,source=$RUNNER_TEMP/trivy-cache,target=/cache" \
             "$SCANNER" image --cache-dir /cache --download-db-only --no-progress
           chmod -R a+rX "$RUNNER_TEMP/trivy-cache"
           # Analyze the saved image offline, without a Docker socket or host credentials.
