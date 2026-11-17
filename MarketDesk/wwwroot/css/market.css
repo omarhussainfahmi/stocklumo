@@ -336,7 +336,7 @@ summary { cursor: pointer; padding: 12px; background: var(--panel); border: 1px 
 .footer-bottom { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); align-items: center; justify-items: center; gap: 12px 32px; margin-top: 4px; font-size: 12px; color: var(--muted); text-align: center; }
 .footer-bottom a { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; }
 .footer-bottom a { grid-column: 3; }
-.footer-signature { margin-top: 0; overflow: hidden; user-select: none; text-align: center; font-family: "Segoe UI Variable", "Segoe UI", sans-serif; font-size: clamp(52px, 18vw, 260px); line-height: .95; font-weight: 750; letter-spacing: -.065em; color: color-mix(in srgb, var(--green) 22%, var(--paper)); }
+.footer-signature { margin-top: 0; overflow: hidden; user-select: none; text-align: center; font-family: "Manrope", sans-serif; font-size: clamp(52px, 18vw, 260px); line-height: .95; font-weight: 750; letter-spacing: -.065em; color: color-mix(in srgb, var(--green) 22%, var(--paper)); }
 @supports (background-clip: text) {
   .footer-signature { background: linear-gradient(180deg, color-mix(in srgb, var(--green) 28%, var(--paper)), color-mix(in srgb, var(--green) 6%, var(--paper))); background-clip: text; -webkit-background-clip: text; color: transparent; }
 }
