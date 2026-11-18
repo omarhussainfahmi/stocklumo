@@ -1,0 +1,60 @@
+<!doctype html><meta charset="utf-8"><canvas width="1920" height="1080"></canvas>
+<script>
+// Deterministic art master. No network market data; all coordinates are periodic.
+const canvas=document.querySelector('canvas'), c=canvas.getContext('2d');
+const TAU=Math.PI*2, smooth=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x)};
+const windowAt=(t,a,b,d,e)=>smooth((t-a)/(b-a))*(1-smooth((t-d)/(e-d)));
+let brand, fontReady;
+window.prepare=async function(svg,font){
+  brand=new Image();brand.src='data:image/svg+xml;base64,'+btoa(svg);await brand.decode();
+  const face=new FontFace('Manrope',`url(data:font/woff2;base64,${font})`);await face.load();document.fonts.add(face);
+};
+function type(text,x,y,size,color,align='center',weight=600){c.fillStyle=color;c.font=`${weight} ${size}px Manrope`;c.textAlign=align;c.fillText(text,x,y)}
+window.render=function(seconds,theme){
+  const t=((seconds%15)+15)%15,p=t/15*TAU,dark=theme==='dark';
+  const paper=dark?'#011428':'#e0e7ee',ink=dark?'#eef6ff':'#102a43',muted=dark?'#a6c1de':'#465f76',mint=dark?'#00dbaa':'#00cfa0',blue=dark?'#f4f7fb':'#104976';
+  c.globalAlpha=1;c.setTransform(1,0,0,1,0,0);c.fillStyle=paper;c.fillRect(0,0,1920,1080);
+  const chart=windowAt(t,1.2,2.8,5.1,7),logo=windowAt(t,5.5,7.8,10.8,13.8);
+  // One camera breath; sine/cosine guarantee position AND velocity at the seam.
+  c.save();c.translate(960,515);c.scale(1+.025*Math.sin(p),1+.025*Math.sin(p));
+  const project=(x,y,z)=>{const angle=.32*Math.sin(p),xx=x*Math.cos(angle)+z*Math.sin(angle),zz=z*Math.cos(angle)-x*Math.sin(angle),k=1100/(1100+zz);return [xx*k,y*k]};
+  // A paired, dimensional signal surface; its folds are derived from one curve.
+  for(let ribbon=1;ribbon>=0;ribbon--){
+    const points=[];
+    for(let i=0;i<=140;i++){
+      const u=i/140,phase=u*TAU-p,spread=1-logo*.25;
+      const x=(u-.5)*1040*spread,y=Math.sin(phase)*125+(ribbon?105:-105)+Math.sin(u*Math.PI)*-90;
+      const z=Math.cos(phase)*125+(ribbon?35:-35),w=34+Math.sin(u*Math.PI)**2*45;
+      points.push({a:project(x,y-w/2,z),b:project(x,y+w/2,z+10),light:(Math.cos(phase)+1)/2});
+    }
+    c.globalAlpha=(1-logo*.96)*(1-chart*.78);
+    c.beginPath();points.forEach((q,i)=>i?c.lineTo(...q.a):c.moveTo(...q.a));points.toReversed().forEach(q=>c.lineTo(...q.b));c.closePath();
+    const satin=c.createLinearGradient(-500,-100,500,150);
+    const palette=ribbon?(dark?['#7a96ab',blue,'#b7ccd9']:['#104976','#397aa6','#104976']):['#008b73',mint,'#9be8d6'];
+    palette.forEach((color,i)=>satin.addColorStop(i/2,color));c.fillStyle=satin;c.fill();
+    c.beginPath();points.forEach((q,i)=>i?c.lineTo(...q.a):c.moveTo(...q.a));c.strokeStyle=ribbon?blue:mint;c.lineWidth=2;c.stroke();
+  }
+  // Two deliberately authored, normalized price paths, not a market index.
+  c.globalAlpha=chart;
+  const samples=[100,100.8,100.35,101.4,100.9,102.5];
+  for(let series=0;series<2;series++){
+    const xy=samples.map((v,i)=>[-330+i*132,130-(v-100)*100+(series?50+Math.sin(i)*35:0)]);
+    c.strokeStyle=series?(dark?'#85b4ff':'#2860b4'):mint;c.lineWidth=series?3:6;c.lineJoin='round';c.lineCap='round';
+    c.beginPath();xy.forEach((q,i)=>i?c.lineTo(...q):c.moveTo(...q));c.stroke();
+    xy.forEach((q,i)=>{c.beginPath();c.arc(q[0],q[1],series?4:7,0,TAU);c.fillStyle=paper;c.fill();c.stroke();});
+  }
+  c.globalAlpha=chart;type('100.00 → 102.50',0,245,34,ink);type('(102.50 − 100.00) / 100.00 × 100',0,292,22,muted);
+  type('+2.50%',0,365,64,dark?'#22e6b0':'#006b50', 'center',800);
+  // The original SVG is the front face, never a redrawn or distorted mark.
+  c.globalAlpha=logo;c.save();c.translate(0,-15);c.rotate(.018*Math.sin(p));
+  c.shadowColor=dark?'#0006':'#102a4322';c.shadowBlur=28;c.shadowOffsetY=18;
+  c.drawImage(brand,-160,-200,320,400);c.shadowBlur=0;c.shadowOffsetY=0;c.restore();
+  c.globalAlpha=windowAt(t,7,8.5,10.8,13);type('CLARITY, FROM MOVEMENT.',0,285,24,muted);
+  c.restore();
+  // Quiet framing and honest disclosure stay readable in the reusable asset.
+  c.globalAlpha=.85;type('STOCKLUMO  /  SIGNAL STUDY',960,123,22,muted);
+  c.globalAlpha=1;c.fillStyle=mint;c.fillRect(925,151,70,3);
+  type('ILLUSTRATIVE MOTION · NOT LIVE MARKET DATA',960,970,18,muted);
+  c.globalAlpha=1;
+};
+</script>

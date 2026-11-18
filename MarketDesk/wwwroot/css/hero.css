@@ -1,0 +1,61 @@
+/* Owner-supplied full-resolution video; copy stays above the decorative layer. */
+body[data-page="home"] .intro { --hero: var(--paper); min-height: max(880px, calc(100svh - 216px)); padding: clamp(140px, calc(100svh - 610px), 420px) 16px 54px; display: grid; grid-template-columns: minmax(0,1fr); align-items: start; isolation: isolate; }
+body[data-page="home"] .intro::after { display: none; }
+body[data-page="home"] .intro-copy { width: min(100%, 900px); margin-inline: auto; text-align: center; position: relative; z-index: 1; }
+body[data-page="home"] .intro h1 { font-size: clamp(40px, 4vw, 64px); line-height: 1.08; margin-bottom: 18px; overflow-wrap: anywhere; }
+body[data-page="home"] .intro-description { max-width: 760px; margin: 0 auto 22px; font-size: clamp(17px, 1.5vw, 22px); }
+body[data-page="home"] .intro .search { max-width: 660px; margin-inline: auto; text-align: left; }
+body[data-page="home"] .intro-actions { justify-content: center; }
+/* The watchlist CTA needs readable glass over both owner-video variants. */
+:root body[data-page="home"] #intro-actions > a[href="/watchlist"] {
+  --hero-watch-fill: #f2faf8c2;
+  background-color: var(--hero-watch-fill);
+  background-image: linear-gradient(160deg, #ffffff18, transparent 60%);
+}
+:root[data-theme="dark"] body[data-page="home"] #intro-actions > a[href="/watchlist"] {
+  --hero-watch-fill: #061f37c7;
+}
+:root body[data-page="home"] #intro-actions > a[href="/watchlist"]:hover {
+  background-color: color-mix(in srgb, var(--hero-watch-fill) 85%, var(--panel));
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root body[data-page="home"] #intro-actions > a[href="/watchlist"],
+  :root body[data-page="home"] #intro-actions > a[href="/watchlist"]:hover { background-color: var(--panel); background-image: none; }
+}
+@media (forced-colors: active) {
+  :root body[data-page="home"] #intro-actions > a[href="/watchlist"],
+  :root body[data-page="home"] #intro-actions > a[href="/watchlist"]:hover { background: ButtonFace; color: ButtonText; border-color: ButtonText; }
+}
+.hero-visual, :root[data-theme="light"] .hero-visual { position: absolute; inset: 0 calc(-1 * var(--gutter)); z-index: -1; pointer-events: none; overflow: hidden; }
+.hero-visual img, .hero-visual video { display: block; position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center bottom; }
+.hero-visual .hero-logo-dark { display: none; }
+:root[data-theme="dark"] .hero-logo-dark { display: block; }
+:root[data-theme="dark"] .hero-logo-light { display: none; }
+.hero-visual video { opacity: 0; transition: opacity 200ms ease; }
+.hero-visual[data-state="ready"] video { opacity: 1; }
+.hero-visual[data-state="ready"] img { opacity: 0; }
+.hero-visual::after { content: none; }
+body[data-page="home"] .workspace-toolbar { display: none; }
+body[data-page="home"] :is(.intro h1, .intro-description, .intro .search label) { text-shadow: 0 0 8px var(--paper), 0 0 18px color-mix(in srgb, var(--green) 35%, transparent); }
+.hero-motion-control { position: absolute; right: 16px; bottom: 10px; z-index: 2; font-size: 12px; padding: 6px 12px; }
+.market-anchor { font-size: clamp(20px,1.55vw,24px); margin: 20px 0 0; }
+/* Match the full-width stage to the original 1890:1080 frame, rather than
+   letterboxing a landscape video inside a taller fixed-height rectangle. */
+@media(min-width:1101px) {
+ body[data-page="home"] .page { max-width: none; }
+ body[data-page="home"] .intro { min-height: calc(100vw * 4 / 7); padding-top: clamp(100px, min(calc(100svh - 610px), calc(100vw * 4 / 7 - 420px)), 420px); }
+}
+@media(max-width:600px) and (max-height:700px) {
+ body[data-page="home"] .intro { padding-top: 24px; }
+}
+@media(max-width:600px) {
+ body[data-page="home"] .intro { min-height: 820px; padding: clamp(110px, calc(100svh - 640px), 240px) 0 64px; }
+ body[data-page="home"] .intro h1 { font-size: clamp(30px,8vw,40px); }
+ body[data-page="home"] .intro-description { margin-bottom:18px; }
+ .hero-visual img, .hero-visual video { top: 3%; height: 90%; object-fit: cover; object-position: center; }
+}
+@media(prefers-reduced-motion:reduce) { .hero-visual video { transition:none; } }
+@media(max-width:360px) {
+ body[data-page="home"] .intro h1 { font-size: clamp(24px,7.4vw,26px); }
+}
+@media(forced-colors:active) { .hero-visual { display:none; } }

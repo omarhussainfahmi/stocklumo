@@ -12,3 +12,5 @@ TestResults/
 playwright-report/
 test-results/
 output/
+
+.desloppify/

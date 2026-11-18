@@ -1,0 +1,32 @@
+const { readFile } = require('node:fs/promises');
+const { test, expect, dismissPrivacy } = require('../support/fixtures.cjs');
+
+test('saved screener preset survives a browser download and explicit file restore', async ({ page }) => {
+  await page.goto('/screener');
+  await dismissPrivacy(page);
+  const query = page.getByLabel('Company or ticker', { exact: true });
+  await query.fill('x'.repeat(100));
+  await page.getByRole('button', { name: 'Save preset', exact: true }).click();
+  await expect(page.locator('#research-status')).toContainText('Preset saved');
+  await page.evaluate(() => localStorage.setItem('stocklumo.watch', JSON.stringify(['AAPL'])));
+  await page.goto('/settings');
+  const consent = await page.evaluate(() => localStorage.getItem('stocklumo.privacy'));
+  const downloadEvent = page.waitForEvent('download');
+  await page.locator('#backup-export').click();
+  const download = await downloadEvent;
+  const file = await download.path();
+  const backup = JSON.parse(await readFile(file, 'utf8'));
+  expect(backup.data['stocklumo.screener'].query).toHaveLength(100);
+  expect(backup.data).not.toHaveProperty('stocklumo.privacy');
+  await page.evaluate(() => localStorage.setItem('stocklumo.watch', JSON.stringify(['MSFT'])));
+  await page.locator('#backup-file').setInputFiles(file);
+  await expect(page.locator('#backup-preview')).toContainText('saved categories will be replaced');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('stocklumo.watch')))).toEqual(['MSFT']);
+  await page.locator('#backup-restore').click();
+  await expect(page.locator('#backup-status')).toContainText('Backup restored');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('stocklumo.watch')))).toEqual(['AAPL']);
+  expect(await page.evaluate(() => localStorage.getItem('stocklumo.privacy'))).toBe(consent);
+  await page.goto('/screener');
+  await page.getByRole('button', { name: 'Load preset', exact: true }).click();
+  await expect(page.getByLabel('Company or ticker', { exact: true })).toHaveValue('x'.repeat(100));
+});

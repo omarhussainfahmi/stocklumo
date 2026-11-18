@@ -1,6 +1,10 @@
 <div class="search">
     <label for="search">Find a stock</label>
-    <input id="search" type="search" maxlength="60" placeholder="Search a company or ticker symbol" autocomplete="off" aria-controls="search-results" />
+    <span class="search-shell">
+        <span class="search-aura" aria-hidden="true"></span>
+        <span class="search-orbit" aria-hidden="true"></span>
+        <input id="search" type="search" maxlength="60" placeholder="Search a company or ticker symbol" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="search" aria-controls="search-results" />
+    </span>
     <p id="search-status" role="status"></p>
     <ul id="search-results" aria-label="Search results" hidden></ul>
 </div>

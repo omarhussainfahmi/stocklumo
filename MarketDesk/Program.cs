@@ -44,6 +44,8 @@ builder.Services.AddHttpsRedirection(options => options.HttpsPort = 443);
 builder.Services.AddSingleton<MarketStore>();
 builder.Services.AddSingleton<FinnhubApi>();
 builder.Services.AddSingleton<ResearchService>();
+builder.Services.AddSingleton<CompanyRegistration>();
+builder.Services.AddSingleton<ResearchPreview>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<StockUniverse>();
 builder.Services.AddHttpClient("Finnhub", c =>
@@ -52,6 +54,7 @@ builder.Services.AddHttpClient("Finnhub", c =>
     c.Timeout = TimeSpan.FromSeconds(10);
     c.MaxResponseContentBufferSize = 2 * 1024 * 1024;
 }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false }).RemoveAllLoggers();
+builder.Services.AddSingleton<MarketSocketFactory>();
 builder.Services.AddHostedService<FinnhubFeed>();
 builder.Services.AddHttpClient("CompanyLogos", c =>
 {
@@ -86,7 +89,7 @@ if (app.Configuration["RENDER"] == "true" && app.Environment.IsProduction())
 }
 app.Use(async (context, next) =>
 {
-    context.Response.Headers.ContentSecurityPolicy = "default-src 'none'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; font-src 'self'; connect-src 'self' https://cloudflareinsights.com; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'";
+    context.Response.Headers.ContentSecurityPolicy = "default-src 'none'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; font-src 'self'; connect-src 'self' https://cloudflareinsights.com; img-src 'self'; media-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'";
     context.Response.Headers.XContentTypeOptions = "nosniff";
     context.Response.Headers.XFrameOptions = "DENY";
     context.Response.Headers["Referrer-Policy"] = "no-referrer";
@@ -110,7 +113,9 @@ app.UseStaticFiles(new StaticFileOptions
 });
 app.UseRouting();
 app.UseRateLimiter();
-app.MapGet("/health", () => Results.Ok(new { status = "ok" })).RequireRateLimiting("read");
+// Liveness must remain independent of public API admission: rejected reads do
+// not mean the process is unhealthy. This endpoint performs no provider work.
+app.MapGet("/health", () => Results.Ok(new { status = "ok" })).DisableRateLimiting();
 app.MapControllers();
 app.Run();
 

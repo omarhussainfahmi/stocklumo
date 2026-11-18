@@ -36,6 +36,19 @@ public sealed class UniverseTests
     }
 
     [Fact]
+    public void DailyReservesKeepTheOriginalOrderAndAreBounded()
+    {
+        var pool = Enumerable.Range(0, 100).Select(i => new UniverseStock("S" + i, "Company", "XNAS")).ToArray();
+        var day = new DateOnly(2026, 10, 29);
+        var candidates = StockUniverse.Select(pool, day, 16);
+        Assert.Equal(16, candidates.Length);
+        Assert.Equal(16, candidates.Distinct().Count());
+        Assert.Equal(StockUniverse.Select(pool, day), candidates.Take(8));
+        Assert.Equal(candidates, StockUniverse.Select(pool.Reverse().ToArray(), day, 16));
+        Assert.NotEqual(candidates, StockUniverse.Select(pool, day.AddDays(1), 16));
+    }
+
+    [Fact]
     public async Task SharedMetadataCacheRetainsOriginalTimestampAndMarksFailedRefreshStale()
     {
         using var handler = new Handler();
@@ -45,7 +58,7 @@ public sealed class UniverseTests
         using var service = new StockUniverse(api, clock);
         var snapshots = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => service.GetAsync(default)));
         Assert.Equal(1, handler.Calls);
-        Assert.All(snapshots, s => { Assert.Equal(1, s.Count); Assert.Equal("ok", s.State); });
+        Assert.All(snapshots, s => { Assert.Equal(1, s.Count); Assert.Equal("ok", s.State); Assert.Equal(s.Selection, s.Candidates); });
         var timestamp = snapshots[0].RetrievedAt;
         clock.Now = clock.Now.AddHours(25);
         handler.Fail = true;

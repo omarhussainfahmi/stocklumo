@@ -1,0 +1,197 @@
+/* Stocklumo optical glass: existing geometry and semantic data colours remain. */
+:root {
+  --glass-base: #f5fbfa8f;
+  --glass-top: #ffffffb3;
+  --glass-bottom: #d5e9e587;
+  --glass-rim: #ffffff;
+  --glass-shadow: #123d5426;
+  --glass-signal: #008c7236;
+  --glass-light: #51bce32b;
+  --glass-control: #ffffffed;
+}
+:root[data-theme="dark"] {
+  --glass-base: #071f35d9;
+  --glass-top: #15374ad9;
+  --glass-bottom: #06372fc2;
+  --glass-rim: #b7f4ed38;
+  --glass-shadow: #00000038;
+  --glass-signal: #00dbaa29;
+  --glass-light: #85b4ff1c;
+  --glass-control: #041a2ceb;
+}
+body {
+  background-image: radial-gradient(ellipse 700px 500px at 95% 360px, var(--glass-signal), transparent 75%), radial-gradient(ellipse 800px 650px at 3% 65%, var(--glass-light), transparent 75%);
+}
+:is(.market-pulse, .workspace-summary > div, .spotlight-stock, .tool-grid > a,
+    .news-item, .price-panel, .company-panel, .watch-panel,
+    .research-controls, .stock-inspector, .data-figure, .settings-body, .policy,
+    .error-page, .table-wrap, .stats, .range-card),
+.market-workspace #discover,
+body[data-page="home"] .market-workspace .tool-grid > a,
+.personal-workspace > .watch-panel, .stock-context > .watch-panel,
+.stock-context > .company-panel, .news-item:first-child {
+  background-color: transparent;
+  background-image: radial-gradient(ellipse at 100% 100%, var(--glass-signal), transparent 65%), linear-gradient(145deg, var(--glass-top), var(--glass-base) 36%, var(--glass-bottom));
+  box-shadow: inset 0 1px 0 var(--glass-rim), inset 0 -1px 0 var(--glass-signal), 0 12px 28px -16px var(--glass-shadow);
+  border-inline-color: color-mix(in srgb, var(--line) 78%, var(--green));
+  border-bottom-color: color-mix(in srgb, var(--line) 78%, var(--green));
+}
+/* Large analytical surface: let the ambient field show through the tint. */
+.market-pulse {
+  --glass-top: #ffffffa3;
+  --glass-base: #f5fbfa85;
+  --glass-bottom: #d5e9e578;
+}
+:root[data-theme="dark"] .market-pulse {
+  --glass-top: #15374ab8;
+  --glass-base: #071f35b8;
+  --glass-bottom: #06372f9e;
+}
+/* A few major surfaces refract the ambient field. Dense repeated tiles use
+   layered paint only, avoiding dozens of composited blur layers. */
+@supports ((backdrop-filter: blur(8px)) or (-webkit-backdrop-filter: blur(8px))) {
+  :is(.price-panel, .research-controls, .company-panel) {
+    background-color: transparent;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+}
+.stock-inspector .data-figure, .watch-panel .table-wrap, .stock-context #watch-empty, #watch-section #watch-empty {
+  background: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.explore-grid a, .market-workspace .explore-grid a, .empty-state:not(#watch-empty), .financial-history-grid figure {
+  background-color: transparent;
+  background-image: linear-gradient(140deg, var(--glass-light), transparent 70%), linear-gradient(145deg, var(--glass-top), var(--glass-base) 36%, var(--glass-bottom));
+}
+.stats > div, .company-info > div { background: transparent; }
+body[data-page="markets"] .market-workspace #discover { background: transparent; box-shadow: none; }
+/* The standalone list needs the same frame that its home/stock parents supply. */
+body[data-page="watchlist"] #watch-section {
+  min-width: 0;
+  padding: clamp(16px, 1.6vw, 24px);
+  border: 1px solid var(--line);
+  border-radius: var(--panel-radius);
+}
+body[data-page="watchlist"] #watch-section .table-wrap { border: 0; border-radius: 0; }
+body[data-page="watchlist"] #storage-status { margin: 12px 0 0; }
+.header, .ticker, .workspace-toolbar, .footer {
+  background-color: var(--panel);
+  background-image: linear-gradient(125deg, var(--glass-top), var(--glass-base) 65%, var(--glass-bottom));
+  box-shadow: inset 0 1px 0 var(--glass-rim);
+}
+.header { -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+/* Light shell mirrors the smoked-glass hierarchy with mineral/mint frost.
+   It is denser than reading cards so scrolling text cannot compete with nav. */
+:root:not([data-theme="dark"]) :is(.header, .ticker, .workspace-toolbar, .footer) {
+  background-color: transparent;
+  background-image: radial-gradient(ellipse at 100% 100%, var(--glass-signal), transparent 70%), linear-gradient(125deg, #ffffffeb, #f1f8f7df 65%, #d9ebe6d6);
+  box-shadow: inset 0 1px 0 var(--glass-rim), inset 0 -1px 0 var(--glass-signal);
+}
+:root:not([data-theme="dark"]) .header { background-color: #ffffff80; }
+:root:not([data-theme="dark"]) .portfolio-metrics,
+:root:not([data-theme="dark"]) .pagination,
+:root:not([data-theme="dark"]) .chips a {
+  background-color: transparent;
+  background-image: radial-gradient(ellipse at 100% 100%, var(--glass-signal), transparent 65%), linear-gradient(145deg, var(--glass-top), var(--glass-base) 36%, var(--glass-bottom));
+}
+:root:not([data-theme="dark"]) .portfolio-metrics > div {
+  background: transparent;
+  box-shadow: inset -1px 0 0 var(--line), inset 0 -1px 0 var(--line);
+}
+:root:not([data-theme="dark"]) .price-panel .plot { background: transparent; }
+/* Control surfaces remain nearly opaque, including native picker popups. */
+input, select, .header .search input, .research-controls :is(input, select), body[data-page="home"] .intro .search input {
+  background-color: var(--glass-control);
+  box-shadow: inset 0 1px 2px var(--glass-shadow), 0 1px 0 var(--glass-rim);
+}
+select option { background: var(--panel); color: var(--ink); }
+button:not(.primary):not(.text-button):not(.clear-input), .button-link:not(.primary) {
+  background-color: var(--panel);
+  background-image: linear-gradient(160deg, var(--glass-rim), transparent 48%);
+  box-shadow: inset 0 1px 0 var(--glass-rim), 0 3px 8px -5px var(--glass-shadow);
+}
+/* Chart ranges are tabs, not raised glass buttons. */
+#ranges button {
+  min-width: 64px;
+  padding-inline: 12px;
+  background: transparent;
+  box-shadow: none;
+}
+#ranges button:hover { background-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+/* The native date input lives inside the painted, rounded date-field frame.
+   Paint focus once on that frame, never around the inset native input. */
+.research-controls .date-field input { outline: none; box-shadow: none; }
+.date-field:focus-within { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
+.date-field:has(input[aria-invalid="true"]) { border-color: var(--red); }
+.date-field:has(input[aria-invalid="true"]):focus-within { box-shadow: 0 0 0 1px var(--red); }
+.primary, body[data-page="home"] .intro .primary {
+  background-image: linear-gradient(180deg, #ffffff26, transparent 65%);
+  box-shadow: inset 0 1px 0 #ffffff5c, inset 0 -1px 0 #00000020, 0 5px 15px -8px var(--green);
+}
+/* Discovery actions use button emphasis, distinct from the glass stock tiles. */
+.discovery-actions #more-stocks {
+  background-color: var(--green);
+  background-image: linear-gradient(180deg, #ffffff26, transparent 65%);
+  color: var(--panel);
+  border-color: var(--green);
+  box-shadow: inset 0 1px 0 #ffffff5c, 0 5px 15px -8px var(--green);
+}
+.discovery-actions #more-stocks:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--green) 88%, var(--ink));
+}
+.discovery-actions #discovery-retry {
+  background: var(--glass-control);
+  color: var(--ink);
+  border-color: var(--control);
+  box-shadow: none;
+}
+.discovery-actions #discovery-retry:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--green);
+}
+@media (forced-colors: active) {
+  .discovery-actions #more-stocks, .discovery-actions #discovery-retry {
+    background: ButtonFace; color: ButtonText; border-color: ButtonText; box-shadow: none;
+  }
+}
+.explore-grid a, .chips a, .filter-chip { box-shadow: inset 0 1px 0 var(--glass-rim); }
+#search-results, .privacy-panel, .unsaved-dialog, .app-dialog {
+  background-color: var(--panel);
+  background-image: linear-gradient(145deg, var(--glass-light), transparent 65%);
+  box-shadow: inset 0 1px 0 var(--glass-rim), 0 18px 48px -16px var(--glass-shadow);
+}
+th { background-image: linear-gradient(180deg, var(--glass-light), transparent); }
+.research-chart, .history-price-chart { background: transparent; }
+.chart-grid line, .distribution-grid { stroke-opacity: .65; }
+/* Existing red/green and distinct comparison colours are preserved. */
+#chart-line, .history-line { filter: drop-shadow(0 0 2px var(--glass-signal)); }
+.notice, #research-status:not(:empty), .empty-state { box-shadow: inset 0 1px 0 var(--glass-rim); }
+@media (hover: hover) and (pointer: fine) {
+  .tool-grid > a:hover, .spotlight-stock:hover, .news-item:hover, .explore-grid a:hover { border-color: var(--green); }
+  body[data-page="home"] .market-workspace .tool-grid > a:hover { background-color: color-mix(in srgb, var(--surface) 86%, transparent); }
+}
+@media (max-width: 1100px), (prefers-reduced-transparency: reduce) {
+  .header, .market-pulse, .price-panel, .research-controls, .company-panel { -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root:not([data-theme="dark"]) :is(.header, .ticker, .workspace-toolbar, .footer) { background-color: var(--panel); }
+  :root:not([data-theme="dark"]) :is(.portfolio-metrics, .pagination, .chips a) { background-color: var(--panel); }
+  :is(.market-pulse, .workspace-summary > div, .spotlight-stock, .tool-grid > a, .news-item, .price-panel, .company-panel, .watch-panel, .research-controls, .stock-inspector, .data-figure, .settings-body, .policy, .error-page, .table-wrap, .stats, .range-card),
+  .market-workspace #discover, body[data-page="home"] .market-workspace .tool-grid > a,
+  .personal-workspace > .watch-panel, .stock-context > .watch-panel, .stock-context > .company-panel, .news-item:first-child,
+  .explore-grid a, .market-workspace .explore-grid a, .empty-state:not(#watch-empty) { background-color: var(--panel); }
+  body[data-page="home"] .market-workspace .tool-grid > a:hover { background-color: var(--panel); }
+  .stock-inspector .data-figure, .watch-panel .table-wrap { background-color: transparent; }
+}
+@media (forced-colors: active) {
+  .date-field:focus-within { outline: 2px solid Highlight; outline-offset: 2px; box-shadow: none; }
+  #ranges button { background-image: none; box-shadow: none; }
+  :root:not([data-theme="dark"]) :is(.header, .ticker, .workspace-toolbar, .footer) { background-image: none; box-shadow: none; }
+  :root:not([data-theme="dark"]) :is(.portfolio-metrics, .portfolio-metrics > div, .pagination, .chips a) { background-image: none; box-shadow: none; }
+  body, .header, .ticker, .workspace-toolbar, .footer,
+  .market-workspace #discover, body[data-page="home"] .market-workspace .tool-grid > a,
+  .personal-workspace > .watch-panel, .stock-context > .watch-panel, .stock-context > .company-panel, .news-item:first-child,
+  #search-results, .privacy-panel, .unsaved-dialog, .app-dialog, .error-page,
+  :is(.market-pulse, .workspace-summary > div, .spotlight-stock, .tool-grid > a, .news-item, .price-panel, .company-panel, .watch-panel, .research-controls, .stock-inspector, .data-figure, .settings-body, .policy, .table-wrap, .stats, .range-card),
+  button, .button-link, input, select { background-image: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+}

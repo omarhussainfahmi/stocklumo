@@ -7,7 +7,10 @@ namespace MarketDesk.Services;
 
 public sealed record UniverseStock(string Symbol, string Name, string Mic);
 public sealed record UniverseSnapshot(string State, string Message, int? Count, int? Exchanges,
-    DateTimeOffset? RetrievedAt, string SelectionDate, UniverseStock[] Selection);
+    DateTimeOffset? RetrievedAt, string SelectionDate, UniverseStock[] Selection)
+{
+    public UniverseStock[] Candidates { get; init; } = [];
+}
 
 // Metadata is not quote coverage or a guarantee of real-time entitlement.
 public sealed class StockUniverse(FinnhubApi api, TimeProvider clock) : IDisposable
@@ -38,10 +41,11 @@ public sealed class StockUniverse(FinnhubApi api, TimeProvider clock) : IDisposa
             }
             var day = DateOnly.FromDateTime(now.UtcDateTime);
             var stale = retrievedAt is not null && now - retrievedAt >= TimeSpan.FromHours(24);
-            return new(stocks is null ? "unavailable" : stale ? "stale" : "ok",
+            var candidates = stocks is null ? [] : Select(stocks, day, 16);
+            return new UniverseSnapshot(stocks is null ? "unavailable" : stale ? "stale" : "ok",
                 stocks is null || stale ? failure : "", stocks?.Length,
                 stocks?.Select(s => s.Mic).Distinct().Count(), retrievedAt, day.ToString("yyyy-MM-dd"),
-                stocks is null ? [] : Select(stocks, day));
+                candidates.Take(8).ToArray()) { Candidates = candidates };
         }
         finally { gate.Release(); }
     }
@@ -55,9 +59,9 @@ public sealed class StockUniverse(FinnhubApi api, TimeProvider clock) : IDisposa
 
     // Shared by visitors and deterministic across restarts. Daily buckets rotate without
     // individual users opening different sets of upstream subscriptions.
-    internal static UniverseStock[] Select(UniverseStock[] pool, DateOnly day) => pool
+    internal static UniverseStock[] Select(UniverseStock[] pool, DateOnly day, int count = 8) => pool
         .OrderBy(s => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{day:yyyy-MM-dd}:{s.Symbol}"))), StringComparer.Ordinal)
-        .Take(8).ToArray();
+        .Take(count).ToArray();
 
     private static string Text(JsonElement row, string name) =>
         row.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString()! : "";

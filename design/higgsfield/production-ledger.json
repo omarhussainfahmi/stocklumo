@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "date": "2026-10-29",
+  "provider": "Higgsfield",
+  "destination": "No media project created; saved auto_create_project=false.",
+  "account": {
+    "plan": "free",
+    "credits_reported": 10,
+    "unlimited_available": false
+  },
+  "attempts": [
+    {
+      "id": "dark-still-first-candidate",
+      "model": "gpt_image_2_5",
+      "parameters": {
+        "aspect_ratio": "16:9",
+        "count": 1
+      },
+      "prompt_file": "prompts/dark-still.txt",
+      "quoted_credits": 0.25,
+      "status": "rejected",
+      "returned_error": "Requires basic plan or higher.",
+      "job_id": null,
+      "accepted_output": null,
+      "corrective_generation": "Not attempted. No retry on another provider or subscription change."
+    }
+  ],
+  "quotes": [
+    {
+      "id": "six-second-motion",
+      "model": "seedance_2_5",
+      "parameters": {
+        "mode": "omni_reference",
+        "aspect_ratio": "16:9",
+        "duration": 6,
+        "resolution": "720p",
+        "generate_audio": false,
+        "count": 1
+      },
+      "quoted_credits": 42,
+      "status": "price_only_no_job",
+      "note": "No reference was uploaded. A price quote does not validate model access or generation readiness. This single clip quote exceeds the reported 10-credit balance."
+    }
+  ],
+  "assets": [],
+  "notes": [
+    "User confirmed no other account with access or existing Higgsfield exports.",
+    "Original existing SVG/Three.js art belongs to the prior implementation, not a Higgsfield result.",
+    "No successful generation, source video, frame sequence or accepted generated poster exists.",
+    "Do not buy a plan, start a trial, consume unrelated free-generation allowances or change account settings automatically."
+  ]
+}

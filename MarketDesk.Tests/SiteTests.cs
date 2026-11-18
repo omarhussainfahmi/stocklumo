@@ -114,10 +114,10 @@ public sealed class SiteTests
         await using var app = CreateApp(); using var client = app.CreateClient();
         for (var i = 0; i < 300; i++)
         {
-            using var allowed = await client.GetAsync("/health");
+            using var allowed = await client.GetAsync("/api/data/search");
             Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
         }
-        using var response = await client.GetAsync("/health");
+        using var response = await client.GetAsync("/api/data/search");
         Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
         Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
         Assert.True(response.Headers.CacheControl?.NoStore);
@@ -125,5 +125,13 @@ public sealed class SiteTests
         Assert.InRange(response.Headers.RetryAfter!.Delta!.Value.TotalSeconds, 1, 60);
         var body = await response.Content.ReadAsStringAsync();
         Assert.Contains("retry", body); Assert.DoesNotContain("StackTrace", body);
+
+        // An exhausted API budget must not reject the hosting liveness probe.
+        using var probeClient = app.CreateClient();
+        using var health = await probeClient.GetAsync("/health");
+        Assert.Equal(HttpStatusCode.OK, health.StatusCode);
+        Assert.Contains("\"status\":\"ok\"", await health.Content.ReadAsStringAsync());
+        using var stillLimited = await client.GetAsync("/api/data/search");
+        Assert.Equal(HttpStatusCode.TooManyRequests, stillLimited.StatusCode);
     }
 }

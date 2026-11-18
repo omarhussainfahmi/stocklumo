@@ -43,6 +43,19 @@ test("analytics loads once only after explicit opt-in and can reopen preferences
   assert.equal(d.querySelectorAll("#cloudflare-analytics").length, 1);
   dom.window.close();
 });
+
+test("dismissing the privacy notice does not grant analytics consent", () => {
+  const dom = site(), w = dom.window, d = w.document;
+  const close = d.querySelector('#privacy-close');
+  assert.equal(close.hidden, false);
+  close.click();
+  assert.equal(d.querySelector('#privacy-panel').hidden, true);
+  assert.equal(w.localStorage.getItem('stocklumo.privacy'), null);
+  assert.equal(d.querySelector('#cloudflare-analytics'), null);
+  d.querySelector('[data-privacy-open]').click();
+  assert.equal(d.querySelector('#privacy-panel').hidden, false);
+  dom.window.close();
+});
 test("rejecting, expired consent, invalid tokens and browser privacy signals do not track", () => {
   for (const options of [{}, { saved: {version:1, analytics:true, at:0} }, { saved:{version:1,analytics:true,at:Date.now()}, blocked:true }, { token: "bad" }]) {
     const dom = site(options), d = dom.window.document;
@@ -65,7 +78,7 @@ test("saved consent restores, and disabled storage leaves an honest visit-only c
 function backups() {
   const dom = new JSDOM(`<body>${readFileSync("MarketDesk/Views/Site/Settings.cshtml", "utf8")}</body>`, {url:"https://example.test/settings",runScripts:"outside-only"});
   dom.window.StocklumoMath = require("../MarketDesk/wwwroot/js/research-math.js");
-  dom.window.eval(readFileSync("MarketDesk/wwwroot/js/backups.js", "utf8")); return dom;
+  dom.window.eval(readFileSync("MarketDesk/wwwroot/js/settings/backups.js", "utf8")); return dom;
 }
 async function upload(dom, text, size = text.length) {
   const input = dom.window.document.querySelector("#backup-file");
@@ -133,7 +146,8 @@ test("invalid comparison input exposes a focused error without provider requests
   const dom = new JSDOM(require("./page-fixture.cjs")(), {url:"https://example.test/compare",runScripts:"outside-only"}), w=dom.window;
   w.StocklumoMath = require("../MarketDesk/wwwroot/js/research-math.js"); let calls=0;
   w.fetch=()=>{calls++;throw Error("Unexpected provider request");};
-  w.eval(readFileSync("MarketDesk/wwwroot/js/research.js","utf8"));
+  w.eval(readFileSync("MarketDesk/wwwroot/js/research/view.js", "utf8"));
+  w.eval(require("./research-scripts.cjs")());
   const input=w.document.querySelector("#research-controls input"); input.value="<script>";
   [...w.document.querySelectorAll("button")].find(b=>b.textContent==="Compare").click();
   assert.equal(input.getAttribute("aria-invalid"),"true");

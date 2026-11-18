@@ -25,8 +25,9 @@ public sealed class ResearchService(FinnhubApi api)
             Text(profile.Data, "finnhubIndustry"), price, price is not null && previous > 0 ? (price - previous) / previous * 100 : null,
             Positive(Number(profile.Data, "marketCapitalization")), Positive(Number(metric, "10DayAverageTradingVolume")),
             Number(metric, "peTTM"), Number(metric, "currentDividendYieldTTM"), price is null ? null : (long?)timestamp,
-            quote.State == "ok" && metrics.State == "ok" ? "ok" : "partial",
-            string.Join(" ", new[] { quote.Message, metrics.Message }.Where(m => m.Length > 0)));
+            price is not null && quote.State == "ok" && metrics.State == "ok" ? "ok" : "partial",
+            string.Join(" ", new[] { quote.Message, metrics.Message,
+                price is null && quote.State == "ok" ? "Quote data unavailable." : "" }.Where(m => m.Length > 0)));
     }
 
     private static decimal? Positive(decimal? value) => value >= 0 ? value : null;

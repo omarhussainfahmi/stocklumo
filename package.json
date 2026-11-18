@@ -2,12 +2,25 @@
   "name": "stocklumo-ui-tests",
   "private": true,
   "scripts": {
-    "test": "node --test tests/*.test.cjs",
-    "test:e2e": "playwright test"
+    "build:hero": "node tools/build-hero.cjs",
+    "check:hero": "node tools/build-hero.cjs --check",
+    "test": "node --test \"tests/**/*.test.cjs\"",
+    "test:e2e": "playwright test",
+    "test:e2e:preview": "playwright test --config=playwright.preview.config.cjs",
+    "lint": "eslint . --no-error-on-unmatched-pattern"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",
+    "@eslint/js": "10.0.1",
     "@playwright/test": "1.64.1",
-    "jsdom": "27.0.1"
+    "esbuild": "0.28.2",
+    "eslint": "10.14.0",
+    "globals": "17.14.0",
+    "gsap": "3.15.0",
+    "jsdom": "27.0.1",
+    "three": "0.186.1"
+  },
+  "overrides": {
+    "minimatch": "^11.0.1"
   }
 }

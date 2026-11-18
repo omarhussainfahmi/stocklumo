@@ -1,0 +1,75 @@
+/* Shared interaction feedback. No hidden content or layout-driven animation. */
+:root {
+  --ease-out: cubic-bezier(.23, 1, .32, 1);
+  --ease-in-out: cubic-bezier(.77, 0, .175, 1);
+  --motion-press: 120ms;
+  --motion-ui: 200ms;
+}
+button, .button-link {
+  transition: transform var(--motion-press) var(--ease-out), background-color var(--motion-press) ease, border-color var(--motion-press) ease;
+}
+button[data-pointer-press]:not(:disabled), .button-link[data-pointer-press] { transform: scale(.97); }
+:is(.tool-grid > a, .explore-grid > a, .news-item, .spotlight-stock) {
+  transition: border-color var(--motion-ui) ease, background-color var(--motion-ui) ease;
+}
+:is(.tool-grid > a, .explore-grid > a, .news-item) { transition: transform var(--motion-ui) var(--ease-out), border-color var(--motion-ui) ease, background-color var(--motion-ui) ease; }
+.direction-icon { transition: transform var(--motion-ui) var(--ease-out); }
+.summary-icon, .close-icon { transition: transform var(--motion-ui) var(--ease-out); }
+/* Quiet plot structure, without changing domains, dimensions or series colours. */
+.pulse-row svg, .data-bar svg, .metric-lane svg {
+  background-image: linear-gradient(to right, color-mix(in srgb, var(--line) 32%, transparent) 1px, transparent 1px);
+  background-size: 25% 100%;
+}
+.pulse-row rect, .data-bar rect, .metric-fill, .eps-bars rect { rx: 1.5px; }
+.pulse-row line, .data-bar line, .distribution-zero { vector-effect: non-scaling-stroke; stroke-width: 1; }
+.chart-grid line, .distribution-grid { stroke-dasharray: 2 5; }
+#chart-line, .research-chart path, .history-line { stroke-linecap: round; stroke-linejoin: round; }
+.pulse-row { border-radius: 4px; transition: background-color 120ms ease; }
+.pulse-row:focus-within { background: var(--surface); }
+.distribution-point:focus-visible circle, .distribution-point[aria-pressed="true"] circle { stroke: var(--ink); stroke-width: 2.5; }
+@media (forced-colors: active) {
+  .pulse-row svg, .data-bar svg, .metric-lane svg { background-image: none; }
+}
+@media (hover: hover) and (pointer: fine) {
+  .pulse-row:hover { background: var(--surface); }
+  .data-bar:hover rect, .metric-lane:hover rect { opacity: .85; }
+}
+@media (hover: hover) and (pointer: fine) {
+  :is(.tool-grid > a, .button-link):hover .direction-right { transform: translateX(3px); }
+  :is(.tool-grid > a, .button-link):hover .direction-external { transform: translate(2px, -2px); }
+  :is(.tool-grid > a, .explore-grid > a, .news-item, .spotlight-stock):hover { border-color: var(--green); }
+  :is(.tool-grid > a, .explore-grid > a, .news-item):hover { transform: translateY(-2px); }
+  .workspace-summary > div:hover .summary-icon { transform: translateY(-1px); }
+  .clear-input:hover .close-icon { transform: rotate(90deg); }
+}
+/* One decorative layer, no cloned controls and no changes to nav dimensions. */
+.motion-nav { position: relative; isolation: isolate; }
+.motion-nav > a { position: relative; z-index: 1; }
+.nav-glide {
+  position: absolute; inset: 0 auto auto 0; pointer-events: none;
+  width: 100%; height: 100%; z-index: 0;
+  background: var(--accent); opacity: 0;
+}
+:root:not([data-theme="dark"]) .nav-glide {
+  background: color-mix(in srgb, var(--green) 28%, transparent);
+}
+:root:not([data-theme="dark"]) .motion-nav > a:is(:hover, :focus-visible, [aria-current="page"]) {
+  color: color-mix(in srgb, var(--green) 75%, var(--ink));
+}
+/* The existing text label and button semantics remain unchanged. */
+.theme-track { display: inline-block; flex: 0 0 26px; width: 26px; height: 16px; border: 1px solid var(--control); border-radius: 999px; position: relative; background: var(--surface); }
+.theme-track::before { content: ''; position: absolute; width: 10px; height: 10px; top: 2px; left: 2px; border-radius: 50%; background: var(--green); transform: translateX(0); transition: transform var(--motion-ui) var(--ease-in-out); }
+:root[data-theme="dark"] .theme-track::before { transform: translateX(10px); }
+body[data-motion-keyboard] .theme-track::before { transition: none; }
+/* Progressive enhancement for native dialogs, including the consent surface. */
+@media (prefers-reduced-motion: no-preference) {
+  body:not([data-motion-keyboard]) dialog[open] { animation: stocklumo-dialog-in 200ms var(--ease-out); }
+  @keyframes stocklumo-dialog-in { from { opacity: .5; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+}
+@media (prefers-reduced-motion: reduce) {
+  button, .button-link, .direction-icon, .summary-icon, .close-icon, .theme-track::before, .tool-grid > a, .explore-grid > a, .news-item { transition: none; }
+  button[data-pointer-press]:not(:disabled), .button-link[data-pointer-press] { transform: none; }
+  :is(.tool-grid > a, .button-link):hover .direction-icon { transform: none; }
+  :is(.tool-grid > a, .explore-grid > a, .news-item):hover { transform: none; }
+  .workspace-summary > div:hover .summary-icon, .clear-input:hover .close-icon { transform: none; }
+}
