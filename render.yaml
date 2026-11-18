@@ -6,5 +6,7 @@ services:
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
     envVars:
+      - key: RateLimits__TrustRenderEdge
+        value: "true"
       - key: Finnhub__ApiKey
         sync: false
