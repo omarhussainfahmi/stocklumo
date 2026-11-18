@@ -367,6 +367,17 @@ Reference screenshots informed the compact analytical layout, not its assets or 
 Validation: Release build passed with zero warnings/errors; 77 backend and 42 frontend tests passed. New cases cover ranges/out-of-range/flat bounds, missing quote counts, logarithmic scaling, inspector and keyboard selection without requests, single observed chart points, negative EPS and missing/zero actuals. All nine local routes passed the 390px overflow check with no console errors; the local preview intentionally used no provider key. Production data and populated visual checks are performed separately. Actual iOS Safari verification still requires a physical device.
 
 
+## Source availability and reuse
+
+Stocklumo is public for viewing and evaluation. Its original code, branding and
+original assets are all rights reserved; this is not an open-source license.
+See [LICENSE](LICENSE) for the scope, GitHub viewing/forking rights, third-party
+license exceptions and permission contact.
+
+Credentials and private audit reports belong outside the repository. Local
+report and browser-session artifacts are ignored; ignore rules do not remove
+files that were previously committed.
+
 ## Launch checklist and privacy - 18 October 2026
 
 - Page-specific titles/descriptions, canonical URLs and Open Graph/Twitter metadata now render on the server. Share graphics use the original mark, with a 1200x630 PNG, PNG favicon fallback and Apple touch icon. SVG brand assets remain small and contain explicit dimensions. Rebuild raster assets with `python tools/build-brand-assets.py` (Pillow; uses Windows Segoe UI fonts).

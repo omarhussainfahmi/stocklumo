@@ -14,3 +14,10 @@ test-results/
 output/
 
 .desloppify/
+
+# Local audit reports and browser session artifacts are not public source.
+audits/
+.playwright-cli/
+STOCKLUMO_HANDOFF.md
+premium-audit.json
+premium-ui.json
