@@ -6,9 +6,11 @@ const rim = page => page.locator('.search-orbit').evaluate(e=>({
 }));
 const aura = page => page.locator('.search-aura').evaluate(e=>({state:getComputedStyle(e,'::before').animationPlayState,name:getComputedStyle(e,'::before').animationName}));
 
-test('signal search works in both themes, pauses during editing and preserves keyboard selection',async({page},info)=>{
-  await page.emulateMedia({reducedMotion:'no-preference'});
-  for(const theme of ['light','dark']) {
+// Give each complete theme journey its own standard timeout and fresh fixture.
+// Combining both journeys can exhaust the shared budget on a busy WebKit runner.
+for(const theme of ['light','dark']) {
+  test(`signal search in ${theme} pauses during editing and preserves keyboard selection`,async({page},info)=>{
+    await page.emulateMedia({reducedMotion:'no-preference'});
     await page.addInitScript(t=>localStorage.setItem('stocklumo.theme',t),theme);
     await page.goto('/');await dismissPrivacy(page);
     // Scroll restoration or privacy focus can leave the hero offscreen.
@@ -43,8 +45,8 @@ test('signal search works in both themes, pauses during editing and preserves ke
     await page.keyboard.press('Enter');await expect(page).toHaveURL(/\/stock\/AAPL$/);
     await expect(page.locator('.header .search-shell')).toBeVisible();
     expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1)).toBe(false);
-  }
-});
+  });
+}
 
 test('signal rim respects reduced motion, shared pause, viewport and high-contrast fallback',async({page})=>{
   await page.emulateMedia({reducedMotion:'reduce'});
