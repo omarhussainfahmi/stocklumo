@@ -64,6 +64,10 @@ builder.Services.AddHttpClient("CompanyLogos", c =>
 }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }).RemoveAllLoggers();
 builder.Services.AddRateLimiter(o =>
 {
+    if (builder.Environment.IsProduction() && builder.Configuration["RENDER"] == "true" &&
+        builder.Configuration.GetValue<bool>("RateLimits:TrustRenderEdge"))
+        o.GlobalLimiter = RenderClientLimits.Create();
+
     o.RejectionStatusCode = 429;
     o.OnRejected = async (context, token) =>
     {
