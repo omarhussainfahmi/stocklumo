@@ -1,8 +1,14 @@
-> Code cleanup completed locally, 17 November 2026: 150 backend, 97 JavaScript and 63 focused browser checks passed, plus lint and local Release publish smoke. See [cleanup details and limits](docs/code-cleanup-2026-11-17.md). Not deployed. Stopped before Branch protection pending the user's next instruction.
-
-> Local maintenance, 17 November 2026: all 108 iPhone/WebKit cases have been checked across bounded batches and focused rechecks (105 passes, three existing desktop-only skips). Earlier failed attempts and the unexplained intermittent native-browser abort are preserved in the audit reports. Prior backend (150), JavaScript (97), captured-preview (24) and production smoke results remain dated verification; runtime code did not change during this browser continuation. Changes are local and have not been deployed. Earlier release results below describe their dated revisions.
-
 # Stocklumo
+
+**v0.1 Beta** is live on Render. Stocklumo is a full-stack U.S. stock research showcase built with ASP.NET Core MVC, C#, Razor, and JavaScript. It includes market snapshots, stock charts, news, an earnings calendar, a screener, side-by-side comparisons, a watchlist, and a practice portfolio.
+
+- [Try Stocklumo](https://stocklumo.onrender.com/)
+- [Browse the source](https://github.com/omarhussainfahmi/stocklumo)
+- [Maintenance handoff](STOCKLUMO_HANDOFF.md)
+
+The November 18 production release is `a6c4d71`. It includes network-based API limits alongside the shared limits. Main CI passed, and live checks verified health, market data, the revised disclosures, and live-stream admission. See [release PR #3](https://github.com/omarhussainfahmi/stocklumo/pull/3) and [release checks](https://github.com/omarhussainfahmi/stocklumo/actions/runs/44383902755).
+
+The dated notes below describe earlier revisions and test runs.
 
 Frontend update (22 October 2026): the approved Market Observatory direction introduces navy/mint and slate light themes, locally hosted Manrope typography, header search, a full-width stock chart, compact range displays and adjacent watchlist/company panels. Original logo assets, routes, provider behavior and browser-local data are preserved. Illustrative candles and indicators from the design reference are not substituted for unavailable provider data. See [DESIGN.md](DESIGN.md) and [design QA](design-qa.md) for the design rules, tests and limitations.
 
