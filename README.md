@@ -15,7 +15,7 @@ Historical verified release (22 October 2026): commit `f94be65` is deployed and 
 
 Stocklumo is an ASP.NET Core 10 MVC stock-tracking application powered by Finnhub. It combines an editorial financial interface with live prices, company pages, a browser-local watchlist and source-linked news.
 
-![Stocklumo displaying actual Finnhub trades and a session chart](docs/stocklumo-desktop.png)
+![Stocklumo homepage in dark mode](docs/stocklumo-home-dark.png)
 
 Captured from the running application on 8 October 2026. Prices in the screenshot are historical observations, not current quotes.
 
