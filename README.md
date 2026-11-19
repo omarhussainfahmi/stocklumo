@@ -4,7 +4,6 @@
 
 - [Try Stocklumo](https://stocklumo.onrender.com/)
 - [Browse the source](https://github.com/omarhussainfahmi/stocklumo)
-- [Maintenance handoff](STOCKLUMO_HANDOFF.md)
 
 The November 18 production release is `a6c4d71`. It includes network-based API limits alongside the shared limits. Main CI passed, and live checks verified health, market data, the revised disclosures, and live-stream admission. See [release PR #3](https://github.com/omarhussainfahmi/stocklumo/pull/3) and [release checks](https://github.com/omarhussainfahmi/stocklumo/actions/runs/44383902755).
 
